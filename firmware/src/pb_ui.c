@@ -16,10 +16,12 @@
  * (PERFORM's keys are the effects). PLAY and REC as printed. KNOB 1..4 are named along the bottom. */
 #include "pb_core.c"
 #include "pb_band.c"
+static void pb_store_tick(void);            /* pb_store.c */
+static void pb_store_boot(void);
+static dstep_t pb_keep[NSTEP];               /* the drums as they were, while a build plays its roll */
 
 static const uint8_t PS_BTN[PS_N] = {B_HOME, B_GLO, B_EDIT, B_SEQ, B_ENV, B_LFO, B_FX, B_SCL, B_ARP, B_SAVE};
 static const char *const PS_NAME[PS_N] = {"STAGE", "MAP", "AUDITION", "GRID", "SOUND", "JAM", "PERFORM", "KEY", "VISUALS", "CART"};
-#define PBC_WHITE RGB(255, 255, 255)
 
 static struct {
     /* AUDITION */
@@ -37,6 +39,14 @@ static struct {
     uint8_t v_mode;
     int16_t star[40][3];
     uint16_t meter[NTRK];
+    /* PERFORM: the build into a drop */
+    uint8_t b_on, b_mute;
+    int16_t b_filt;
+    uint32_t b_beat0;
+    /* VISUALS: the run */
+    uint8_t r_on, r_lives, r_flash, r_jv, r_dv;
+    uint16_t r_score, r_best, r_combo;
+    uint32_t r_jump, r_duck, r_last, r_off;
     /* CART */
     uint8_t c_page, c_slot, c_act, c_item;
     /* frame */
@@ -44,8 +54,6 @@ static struct {
     uint32_t tap_ms[4];
     uint8_t tap_n;
 } pu = {.g_len = 2, .j_rate = 0};
-static pb_ev_t pb_tmp[PB_STEPS];
-static pb_dstep_t pb_dtmp[PB_STEPS];
 
 /* ------------------------------------------------------------------ helpers --- */
 UI_SMALL static void pb_cpy(char *d, const char *s, uint32_t max) { str_cpy(d, s, max); }
@@ -549,7 +557,7 @@ UI_SMALL static void gr_draw(void)
             uint32_t on = d->on[0] | (uint32_t)d->on[1] << 8;
             for (r = 0; r < rows; r++)
                 if ((on >> (pu.g_lane + r)) & 1u)
-                    cv_rect(42 + (int32_t)c * 12, y0 + (int32_t)(rows - 1u - r) * rh, 11, rh - 1, PB_BODY[TRK_DRUM]);
+                    cv_rect(42 + (int32_t)c * 12, y0 + (int32_t)(rows - 1u - r) * rh, 11, rh - 1, PB_BODY(TRK_DRUM));
         }
     } else {
         uint8_t held[4];
@@ -568,7 +576,7 @@ UI_SMALL static void gr_draw(void)
                 int32_t row = pb_note_deg(&pb.s, held[r]) - pu.g_base;
                 if (row < 0 || row >= (int32_t)rows)
                     continue;
-                cv_rect(42 + (int32_t)(i & 15u) * 12, y0 + ((int32_t)rows - 1 - row) * rh, head ? 11 : 12, rh - 1, PB_BODY[song.sel % NTRK]);
+                cv_rect(42 + (int32_t)(i & 15u) * 12, y0 + ((int32_t)rows - 1 - row) * rh, head ? 11 : 12, rh - 1, PB_BODY(song.sel));
                 if (head)
                     cv_rect(42 + (int32_t)(i & 15u) * 12, y0 + ((int32_t)rows - 1 - row) * rh, 2, rh - 1, PBC_WHITE);
             }
@@ -725,7 +733,7 @@ UI_SMALL static void jm_judge(int keep)
 }
 UI_SMALL static void jm_draw(void)
 {
-    static const char *const L[4] = {"EVERY", "ENERGY", 0, 0};
+    static const char *const L[4] = {"EVERY", "ENERGY", "MORPH", 0};
     char v[4][8], line[32];
     uint32_t t;
     pb_head("JAM");
@@ -753,6 +761,7 @@ UI_SMALL static void jm_draw(void)
     pb_txt(3, 184, "LFO: CHANGE A PART NOW", PBC_MID);
     if (pu.j_rate) fmt_int(v[0], pu.j_rate); else pb_cpy(v[0], "OFF", 8);
     fmt_int(v[1], pb.energy * 5);
+    fmt_int(v[2], pb.morph * 10);
     pb_foot(L, v);
 }
 UI_SMALL static void jm_knob(uint32_t k, int32_t s)
@@ -763,6 +772,13 @@ UI_SMALL static void jm_knob(uint32_t k, int32_t s)
         pu.j_rate = R[clamp((int32_t)at + (s > 0 ? 1 : -1), 0, 3)];
     } else if (k == 1u)
         st_knob(1, s);
+    else if (k == 2u) {                      /* every part leans towards its next idea */
+        int32_t m = clamp(pb.morph + (s > 0 ? 1 : -1), 0, 10);
+        if (m != pb.morph && !pb_need_sketch()) {
+            pb.morph = (uint8_t)m;
+            pb_rewrite_all();
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ PERFORM --- */
@@ -770,6 +786,69 @@ static const char *const PF_SHORT[PUNCH_NFX] = {
     "L4", "L8", "L16", "L32", "STU", "REV", "STP", "HLF", "LOW", "HI", "TEL", "CRU", "ALI", "GAT", "ECH", "WOB",
     "K.LO", "K.MI", "K.HI", "RWND", "OCT+", "FLNG", "PAN", "FRZ", "L8T", "MONO", "FADE"};
 UI_SMALL static void pf_enter(void) { ly_lock = LY_FX; }
+/* the build: from the next bar, two bars of a snare roll with the bass out and the filter rising; then the drop:
+ * the drums back, the filter open, everyone awake */
+UI_SMALL static void bd_restore(void)
+{
+    fm1_irq_off();
+    memcpy(TDRUM->dstep, pb_keep, sizeof pb_keep);
+    fm1_irq_on();
+    song.g[G_FILT] = pu.b_filt;
+    trk[0].p[P_MUTE] = pu.b_mute;
+    pu.b_on = 0;
+}
+UI_SMALL static void bd_arm(void)
+{
+    if (pu.b_on) { ui_message("THE BUILD IS ON ITS WAY"); return; }
+    if (!song.playing) { ui_message("PRESS PLAY FIRST"); return; }
+    pu.b_on = 1;
+    pu.b_beat0 = clk_beat;
+    ui_message("BUILD: FROM THE NEXT BAR");
+}
+UI_SMALL static void bd_tick(void)           /* every frame, on every screen */
+{
+    uint32_t i, s0, t;
+    if (!pu.b_on)
+        return;
+    if (!song.playing) {
+        if (pu.b_on == 2u) bd_restore();
+        pu.b_on = 0;
+        return;
+    }
+    if (pu.b_on == 1u) {
+        if (clk_beat / 4u == pu.b_beat0 / 4u)
+            return;                          /* (the bar it was asked in still plays) */
+        pu.b_beat0 = clk_beat & ~3u;
+        s0 = (TDRUM->seq_idx + 1u) & 48u;     /* the bar of the pattern that just began */
+        pu.b_filt = song.g[G_FILT];
+        pu.b_mute = (uint8_t)trk[0].p[P_MUTE];
+        fm1_irq_off();
+        memcpy(pb_keep, TDRUM->dstep, sizeof pb_keep);
+        for (i = 0; i < 32u; i++) {
+            dstep_t *d = &TDRUM->dstep[(s0 + i) & 63u];
+            memset(d, 0, sizeof *d);
+            if (i < 16u) {
+                if (!(i & 3u)) d->on[0] |= 1u;        /* kick on the beats, snare on the eighths */
+                if (!(i & 1u)) d->on[0] |= 4u;
+            } else {
+                d->on[0] |= 4u;                       /* then every sixteenth, toms into the drop */
+                if (i >= 28u) d->on[1] |= 2u;
+            }
+        }
+        fm1_irq_on();
+        trk[0].p[P_MUTE] = 1;
+        pu.b_on = 2;
+        return;
+    }
+    i = clk_beat - pu.b_beat0;
+    if (i >= 8u) {
+        bd_restore();
+        for (t = 0; t < NTRK; t++)
+            trk[t].p[P_MUTE] = 0;
+        ui_message("DROP!");
+    } else
+        song.g[G_FILT] = (int16_t)clamp(pu.b_filt + (int32_t)i * 6, -64, 63);
+}
 UI_SMALL static void pf_leave(void)
 {
     fm1_irq_off();
@@ -787,7 +866,7 @@ UI_SMALL static void pf_draw(void)
     uint32_t i;
     int32_t cur = punch.req;
     pb_head("PERFORM");
-    pb_txt(3, 18, "HOLD A KEY: ITS EFFECT", PBC_MID);
+    pb_txt(3, 18, pu.b_on == 2u ? "BUILDING: THE DROP IS COMING" : pu.b_on ? "THE BUILD STARTS NEXT BAR" : "HOLD A KEY. FX: BUILD + DROP", pu.b_on ? PBC_GOLD : PBC_MID);
     for (i = 0; i < 16u; i++) {              /* the white keys, two rows of eight */
         int32_t x = 1 + (int32_t)(i % 8u) * 30, y = 38 + (int32_t)(i / 8u) * 24;
         int hot = cur == (int32_t)i;
@@ -901,12 +980,137 @@ UI_SMALL static void ky_knob(uint32_t k, int32_t s)
 }
 
 /* ------------------------------------------------------------------ VISUALS --- */
+/* ---- the run: a game hidden in the VISUALS. The member runs along the drum part that plays: a kick is a block to
+ * jump, a snare a beam to duck. The high keys (or OCT+) jump, the low keys (or OCT-) duck. A miss puts a member of
+ * the band to sleep; twelve clean in a row wake one. The keys play no notes meanwhile (the MIX layer, locked). */
+UI_SMALL static uint32_t rn_pos(void) { return clk_beat * 1024u + clk_pos / (BEAT_U / 1024u); }   /* 1/256 of a step */
+UI_SMALL static uint32_t rn_kind(uint32_t step)                 /* 0 nothing, 1 jump, 2 duck */
+{
+    const dstep_t *d = &TDRUM->dstep[(step + pu.r_off) & 63u];
+    if (step & 1u)
+        return 0;                            /* (the eighths only: room to land) */
+    return (d->on[0] & 1u) ? 1u : (d->on[0] & 0x0Cu) ? 2u : 0u;
+}
+UI_SMALL static void rn_start(void)
+{
+    uint32_t t;
+    if (pb_need_sketch())
+        return;
+    for (t = 0; t < NTRK; t++)
+        trk[t].p[P_MUTE] = 0;
+    pu.r_lives = 3; pu.r_score = 0; pu.r_combo = 0; pu.r_jv = pu.r_dv = 0; pu.r_flash = 0;
+    pu.r_last = rn_pos();
+    pu.r_on = 1;
+    if (!song.playing)
+        transport_req = 1;
+}
+UI_SMALL static void rn_press(int jump)
+{
+    if (pu.r_on != 1u) {
+        rn_start();
+        return;
+    }
+    if (jump) { pu.r_jump = rn_pos(); pu.r_jv = 1; }
+    else { pu.r_duck = rn_pos(); pu.r_dv = 1; }
+}
+UI_SMALL static void rn_tick(void)
+{
+    static const uint8_t SLEEP[3] = {2, 1, 0};
+    uint32_t p, s, guard = 0, t;
+    if (pu.r_flash)
+        pu.r_flash--;
+    if (pu.r_on != 1u)
+        return;
+    if (!song.playing && !transport_req) {
+        pu.r_on = 0;
+        return;
+    }
+    p = rn_pos();
+    if (p < pu.r_last || p - pu.r_last > 16u * 256u)
+        pu.r_last = p;                       /* (the transport started again, or a long frame: from here) */
+    pu.r_off = (TDRUM->seq_idx - (p >> 8)) & 63u;
+    for (s = ((pu.r_last - 48u) >> 8) + 1u; s * 256u + 48u <= p && guard < 8u; s++, guard++) {
+        uint32_t at = s * 256u + 48u, k;     /* a step is judged a moment after it passed: a late press still counts */
+        if (at <= pu.r_last || (k = rn_kind(s)) == 0u)
+            continue;
+        if (k == 1u ? (pu.r_jv && at - pu.r_jump < 470u) : (pu.r_dv && at - pu.r_duck < 470u)) {
+            pu.r_score = (uint16_t)(pu.r_score + 10u + (pu.r_combo > 20u ? 20u : pu.r_combo));
+            pu.r_combo++;
+            if (pu.r_combo % 12u == 0u)
+                for (t = 0; t < 3u; t++)
+                    if (trk[SLEEP[2u - t]].p[P_MUTE]) { trk[SLEEP[2u - t]].p[P_MUTE] = 0; if (pu.r_lives < 3u) pu.r_lives++; break; }
+        } else {
+            pu.r_combo = 0;
+            pu.r_flash = 6;
+            for (t = 0; t < 3u; t++)
+                if (!trk[SLEEP[t]].p[P_MUTE]) { trk[SLEEP[t]].p[P_MUTE] = 1; break; }
+            if (pu.r_lives)
+                pu.r_lives--;
+            if (!pu.r_lives) {
+                pu.r_on = 2;
+                if (pu.r_score > pu.r_best)
+                    pu.r_best = pu.r_score;
+                break;
+            }
+        }
+    }
+    pu.r_last = p;
+}
+UI_SMALL static void rn_draw(void)
+{
+    uint32_t p = rn_pos(), sel = song.sel % NTRK, i, s;
+    int32_t h = 0, duck;
+    char line[32];
+    pb_head("RUN!");
+    for (i = 0; i < 3u; i++)
+        cv_rect(6 + (int32_t)i * 16, 22, 12, 10, i < pu.r_lives ? PBC_HOT : PBC_DIM);
+    pb_txt(70, 19, "SCORE", PBC_MID); pb_num(118, 19, pu.r_score, PBC_WHITE);
+    pb_txt(170, 19, "BEST", PBC_MID); pb_num(206, 19, pu.r_best, PBC_GOLD);
+    pb_band_row(50, 2);
+    if (pu.r_combo > 1u) {
+        pb_cpy(line, "COMBO ", sizeof line);
+        pb_catn(line, pu.r_combo, sizeof line);
+        pb_txtc(120, 86, line, PBC_MINT);
+    }
+    pb_txtc(120, 102, pu.r_on == 1u ? "LOW KEYS DUCK, HIGH KEYS JUMP" : pu.r_on == 2u ? "GAME OVER. ANY KEY: AGAIN" : "ANY KEY, OR ARP: START", pu.r_on == 1u ? PBC_MID : PBC_WHITE);
+    /* the field: the lower half of the screen */
+    if (pu.r_flash)
+        cv_rect(0, 120, 240, 120, PBC_DIM);
+    cv_rect(0, 228, 240, 12, PBC_MID);
+    for (i = 0; i < 11u; i++)                /* the ground moves with the beat */
+        cv_rect((int32_t)i * 26 - (int32_t)((p % 256u) * 26u / 256u) + 4, 232, 12, 2, PBC_DIM);
+    if (pu.r_on == 1u || song.playing)
+        for (s = (p >> 8) - (p >= 512u ? 2u : 0u); s < (p >> 8) + 9u; s++) {
+            int32_t x = 56 + (int32_t)(s * 256u - p) * 26 / 256;
+            uint32_t k = pu.r_on == 1u ? rn_kind(s) : 0u;
+            if (k == 1u) {
+                cv_rect(x - 5, 214, 10, 14, PBC_GOLD);
+                cv_rect(x - 3, 216, 6, 3, PBC_WHITE);
+            } else if (k == 2u) {
+                cv_rect(x - 4, 122, 8, 84, PBC_HOT);
+                cv_rect(x - 6, 200, 12, 6, PBC_WHITE);
+            }
+        }
+    duck = pu.r_on == 1u && pu.r_dv && p - pu.r_duck < 470u;
+    if (pu.r_on == 1u && pu.r_jv && p - pu.r_jump < 470u) {
+        int32_t t = (int32_t)(p - pu.r_jump);
+        h = 46 * 4 * t * (470 - t) / (470 * 470);
+    }
+    if (duck)
+        pb_sprite(sel, 48, 212, 1, 0);
+    else
+        pb_sprite(sel, 40, 196 - h, 2, pu.r_on == 2u);
+}
 UI_SMALL static void vs_draw(void)
 {
-    static const char *const L[4] = {"MODE", 0, 0, 0}, *const M[3] = {"SCOPE", "METERS", "STARS"};
+    static const char *const L[4] = {"MODE", 0, 0, 0}, *const M[4] = {"SCOPE", "METERS", "STARS", "RUN"};
     char v[4][8];
     uint32_t i, w = scope_w;
     int kick = song.playing && clk_pos < BEAT_U / 6u;
+    if (pu.v_mode == 3u) {
+        rn_draw();
+        return;
+    }
     pb_head("VISUALS");
     if (pu.v_mode == 0u) {
         int32_t py = 110;
@@ -941,7 +1145,7 @@ UI_SMALL static void vs_draw(void)
         }
         pb_band_row(176, 1);
     }
-    pb_cpy(v[0], M[pu.v_mode % 3u], 8);
+    pb_cpy(v[0], M[pu.v_mode % 4u], 8);
     pb_foot(L, v);
 }
 UI_SMALL static void vs_tick(void)           /* the meters: the tracks' peaks, read once a frame, falling */
@@ -959,9 +1163,9 @@ UI_SMALL static void vs_tick(void)           /* the meters: the tracks' peaks, r
 }
 
 /* ------------------------------------------------------------------ CART --- */
-enum { CI_LIGHTS, CI_KEYS, CI_CLICK, CI_SYNC, CI_MIDI, CI_RATE, CI_LOWCUT, CI_CORE, CI_CAL, CI_NEW, CI_ABOUT, CI_N };
+enum { CI_LIGHTS, CI_KEYS, CI_CLICK, CI_SYNC, CI_MIDI, CI_RATE, CI_LOWCUT, CI_CORE, CI_SKIN, CI_CAL, CI_NEW, CI_ABOUT, CI_N };
 static const char *const CI_NAME[CI_N] = {"PANEL LIGHTS", "KEY LIGHTS", "CLICK", "CLOCK FROM", "MIDI OUT", "USB AUDIO", "SPEAKER LOW CUT",
-                                          "SECOND CORE", "CALIBRATE", "NEW SKETCHBOOK", "ABOUT"};
+                                          "SECOND CORE", "SKIN", "CALIBRATE", "NEW SKETCHBOOK", "ABOUT"};
 UI_SMALL static void ct_value(uint32_t it, char *o)
 {
     static const char *const LV[4] = {"OFF", "LOW", "MID", "HIGH"}, *const KY[4] = {"OFF", "C", "WHITE", "ALL"};
@@ -976,6 +1180,7 @@ UI_SMALL static void ct_value(uint32_t it, char *o)
     case CI_RATE: pb_cpy(o, RT[usb_rate % 3u], 8); break;
     case CI_LOWCUT: pb_cpy(o, settings.lowcut ? "ON" : "OFF", 8); break;
     case CI_CORE: pb_cpy(o, cpu1_off ? "OFF" : "ON", 8); break;
+    case CI_SKIN: pb_cpy(o, PB_SKIN_NAME[pb.skin % PB_SKINS], 9); break;
     default: pb_cpy(o, "SAVE", 8); break;
     }
 }
@@ -990,6 +1195,7 @@ UI_SMALL static void ct_set(uint32_t it, int32_t s)
     case CI_RATE: usb_rate = (uint8_t)clamp(usb_rate + s, 0, 2); ui_message("AT THE NEXT POWER-ON"); break;
     case CI_LOWCUT: settings.lowcut = s > 0; fx_lowcut = (uint8_t)(settings.lowcut != 0); break;
     case CI_CORE: cpu1_off = s < 0; cpu1_units = cpu1_off ? 0 : -1; break;
+    case CI_SKIN: pb.skin = (uint8_t)(((int32_t)pb.skin + s + (int32_t)PB_SKINS) % (int32_t)PB_SKINS); pb_skin_apply(); return;
     default: return;
     }
     settings_later = 1;
@@ -1041,12 +1247,13 @@ UI_SMALL static void ct_draw(void)
             pb_txt(40, y + 7, (ready >> i) & 1u ? (live_sec == (int32_t)i ? "PLAYING / LAST USED" : "HOLDS A SKETCH") : "EMPTY", (ready >> i) & 1u ? PBC_INK : PBC_MID);
         }
         pb_cpy(line, "SAVE: ", sizeof line);
-        pb_cat(line, pu.c_act ? "PLAY SLOT " : "STORE IN SLOT ", sizeof line);
         one[0] = (char)('A' + pu.c_slot);
-        pb_cat(line, one, sizeof line);
+        pb_cat(line, pu.c_act == 2u ? "CHAIN THE STORED SLOTS" : pu.c_act ? "PLAY SLOT " : "STORE IN SLOT ", sizeof line);
+        if (pu.c_act != 2u)
+            pb_cat(line, one, sizeof line);
         pb_txt(8, 178, line, (ui.frame >> 4 & 1u) ? PBC_WHITE : PBC_GOLD);
         pb_cpy(v[1], one, 8);
-        pb_cpy(v[2], pu.c_act ? "PLAY" : "STORE", 8);
+        pb_cpy(v[2], pu.c_act == 2u ? "CHAIN" : pu.c_act ? "PLAY" : "STORE", 8);
         pb_foot(LS, v);
     } else if (pu.c_item == CI_ABOUT) {
         pb_txt(4, 38, FELUCCA_VERSION, PBC_WHITE);
@@ -1058,7 +1265,7 @@ UI_SMALL static void ct_draw(void)
         pb_txt(4, 142, "GPL-3.0, NO WARRANTY", PBC_GOLD);
         pb_txt(4, 160, "FONT: TERMINUS (OFL)", PBC_MID);
         pb_txt(4, 176, "SAMPLES: VERSILIAN, SONIC PI", PBC_MID);
-        pb_txt(4, 190, "(CC0)", PBC_MID);
+        pb_txt(4, 190, "(CC0)   SAVE: TAKE A BOW", PBC_MID);
         pb_cpy(v[1], "ABOUT", 8); v[2][0] = 0;
         pb_foot(LU, v);
     } else {
@@ -1093,7 +1300,7 @@ UI_SMALL static void ct_knob(uint32_t k, int32_t s)
         }
     } else if (pu.c_page == 1u) {
         if (k == 1u) pu.c_slot = (uint8_t)((pu.c_slot + (s > 0 ? 1u : 3u)) % 4u);
-        else if (k == 2u) pu.c_act = (uint8_t)(s > 0);
+        else if (k == 2u) pu.c_act = (uint8_t)clamp(pu.c_act + (s > 0 ? 1 : -1), 0, 2);
     } else {
         if (k == 1u) pu.c_item = (uint8_t)clamp(pu.c_item + (s > 0 ? 1 : -1), 0, CI_N - 1);
         else if (k == 2u) ct_set(pu.c_item, s > 0 ? 1 : -1);
@@ -1111,6 +1318,25 @@ UI_SMALL static void ct_action(void)
         if (!pu.c_act) {
             section_store(s);
             ui_message("STORED");
+        } else if (pu.c_act == 2u) {         /* the stored slots one after the other, each for its own length, round */
+            uint8_t list[4];
+            uint32_t n = 0, i;
+            for (i = 0; i < 4u; i++)
+                if ((arrangement_ready() >> i) & 1u)
+                    list[n++] = (uint8_t)i;
+            if (n < 2u) ui_message("STORE TWO SLOTS FIRST");
+            else if (!song.playing) ui_message("PRESS PLAY FIRST");
+            else {
+                fm1_irq_off();
+                for (i = 0; i < n; i++)
+                    chain_sec[i] = list[i];
+                chain_i = 0;
+                chain_bars = (uint8_t)section_bars(list[0]);
+                live_req = (int8_t)list[0];
+                chain_n = (uint8_t)n;
+                fm1_irq_on();
+                ui_message("THE SLOTS PLAY IN TURN");
+            }
         } else if (!((arrangement_ready() >> s) & 1u))
             ui_message("THAT SLOT IS EMPTY");
         else if (song.playing) {
@@ -1123,6 +1349,11 @@ UI_SMALL static void ct_action(void)
     } else if (pu.c_item == CI_CAL) {
         if (song.playing) ui_message("STOP FIRST");
         else { panel_setup(); settings_save(); }
+    } else if (pu.c_item == CI_ABOUT) {
+        uint32_t t;                          /* the band takes a bow: everyone awake, the first sketch's home town */
+        for (t = 0; t < NTRK; t++)
+            trk[t].p[P_MUTE] = 0;
+        ui_message("THANK YOU FOR PLAYING");
     } else if (pu.c_item == CI_NEW) {
         project_new();
         pb.have = 0;
@@ -1131,12 +1362,29 @@ UI_SMALL static void ct_action(void)
 }
 
 /* ------------------------------------------------------------------ the frame, the buttons, the LEDs --- */
-UI_SMALL static void go_home(void) { pb.scr = PS_STAGE; ui.force = 1; }
+UI_SMALL static void vs_mode(uint32_t m)      /* the run takes the keys (no notes); the others give them back */
+{
+    pu.v_mode = (uint8_t)(m % 4u);
+    pu.r_on = 0;
+    ly_lock = pb.scr == PS_VIS && pu.v_mode == 3u ? LY_MIX : LY_PLAY;
+}
+UI_SMALL static void go_home(void)
+{
+    static uint8_t booted;
+    pb.scr = PS_STAGE;
+    ui.force = 1;
+    if (!booted) {
+        booted = 1;
+        pb_store_boot();                     /* the sketch as it was when the FM-1 was switched off */
+    }
+}
 UI_SMALL static void pb_goto(uint32_t s)
 {
     if (pb.scr == PS_AUDITION) au_leave();
     if (pb.scr == PS_PERFORM) pf_leave();
+    if (pb.scr == PS_VIS) { ly_lock = LY_PLAY; pu.r_on = 0; }
     pb.scr = (uint8_t)(s % PS_N);
+    if (s == PS_VIS) vs_mode(pu.v_mode);
     if (s == PS_AUDITION && pb.have) au_build();
     if (s == PS_GRID) gr_focus();
     if (s == PS_PERFORM) pf_enter();
@@ -1157,9 +1405,12 @@ UI_SMALL static void pb_action(void)         /* the screen's own button again */
     case PS_GRID: gr_put(gr_drum() ? (uint32_t)pu.g_row : pb_note(&pb.s, pu.g_row), 1); break;
     case PS_SOUND: pu.s_page = (uint8_t)((pu.s_page + 1u) % 3u); break;
     case PS_JAM: pu.j_bar = clk_beat / 4u; jm_change(); break;
-    case PS_PERFORM: pb_wake_toggle(); break;
+    case PS_PERFORM: bd_arm(); break;
     case PS_KEY: ky_next_chords(); break;
-    case PS_VIS: pu.v_mode = (uint8_t)((pu.v_mode + 1u) % 3u); break;
+    case PS_VIS:
+        if (pu.v_mode == 3u && pu.r_on != 1u) rn_start();
+        else vs_mode((pu.v_mode + 1u) % 4u);
+        break;
     default: ct_action(); break;
     }
 }
@@ -1192,6 +1443,7 @@ UI_SMALL static void ui_input(void)
     step_in_r = step_in_w;
     rec_go = 0; ft_bars = 0; mono_hint = 0; er_flash = 0;
     jm_tick();
+    bd_tick();
     for (id = 0; id < 14u; id++) {
         uint32_t b;
         if (!((pressed >> id) & 1u))
@@ -1204,6 +1456,8 @@ UI_SMALL static void ui_input(void)
         else if (b == B_OCTDN || b == B_OCTUP) {
             if (pb.scr == PS_JAM)
                 jm_judge(b == B_OCTUP);
+            else if (pb.scr == PS_VIS && pu.v_mode == 3u)
+                rn_press(b == B_OCTUP);
             else if (pb.scr != PS_PERFORM && song.sel != TRK_DRUM)
                 song.octave = (int8_t)clamp(song.octave + (b == B_OCTUP ? 1 : -1), -3, 3);
         } else
@@ -1216,6 +1470,8 @@ UI_SMALL static void ui_input(void)
         pu.thr = (uint8_t)(((fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u) | (((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u) << 1));
         thr_req = pu.thr;
     }
+    if (pb.scr == PS_VIS && pu.v_mode == 3u && notes)
+        rn_press((notes >> 13) != 0u);         /* F3..F#4 duck, G4..G5 jump */
     if (pb.scr == PS_GRID && notes && !song.playing && !gr_drum()) {   /* stopped: a key writes its note, the cursor moves on */
         for (k = 0; k < 27u; k++)
             if ((notes >> k) & 1u) {
@@ -1249,7 +1505,7 @@ UI_SMALL static void ui_input(void)
         case PS_JAM: jm_knob(k, s); break;
         case PS_PERFORM: pf_knob(k, s); break;
         case PS_KEY: ky_knob(k, s); break;
-        case PS_VIS: if (k == 0u) pu.v_mode = (uint8_t)((pu.v_mode + (s > 0 ? 1u : 2u)) % 3u); break;
+        case PS_VIS: if (k == 0u) vs_mode((pu.v_mode + (s > 0 ? 1u : 3u)) % 4u); break;
         default: ct_knob(k, s); break;
         }
     }
@@ -1257,18 +1513,24 @@ UI_SMALL static void ui_input(void)
 UI_SMALL static void ui_draw(void)
 {
     uint32_t pass;
+    int game = pb.scr == PS_VIS && pu.v_mode == 3u, all = 0;
     ui.frame++;
     vs_tick();
+    rn_tick();
+    pb_store_tick();
     if (!pb.tiles_ok)
         pb_map_build();
     if (!pu.drawn || ui.force) {
         pu.drawn = 1;
+        all = 1;
         lcd_fill(0, 0, 240, 240, PBC_BG);
-    } else if (ui.frame & 1u) {
+    } else if (!game && (ui.frame & 1u)) {
         return;
     }
     ui.force = 0;
     for (pass = 0; pass < 2u; pass++) {
+        if (game && !pass && !all && (ui.frame & 7u))
+            continue;                        /* the run: the field every frame, the score above it now and then */
         cv_begin(240, 120, PBC_BG);
         cv_oy = -(int32_t)(pass * 120u);
         switch (pb.scr) {

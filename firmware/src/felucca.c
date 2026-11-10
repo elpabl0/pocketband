@@ -189,4 +189,5 @@ static void ed_service(void) {}   /* Pocket Band: SLOOP's web editor protocol is
 #include "recovery.c"        /* early, polled USB updater; no synth or settings */
 #endif
 /* (the boot screen: pb_ui.c) */
+#include "pb_store.c"        /* Pocket Band: the sketch kept across power-off */
 #include "main.c"

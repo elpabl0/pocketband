@@ -60,10 +60,17 @@ static uint32_t up_count(void) { return 0; }
 static uint32_t up_nth(uint32_t n) { return n; }
 static uint32_t up_rank(uint32_t s) { return s; }
 static void settings_save(void) { saves++; }
-static int st_read(uint32_t off, void *dst, uint32_t n) { (void)off, (void)dst, (void)n; return -1; }
-static int st_erase(uint32_t off) { (void)off; return -1; }
-static int st_prog(uint32_t off, const void *src, uint32_t n) { (void)off, (void)src, (void)n; return -1; }
+static uint8_t nor[0x100000];               /* the 1 MiB flash, in RAM */
+static uint32_t nor_erases;
+static int st_read(uint32_t off, void *dst, uint32_t n) { if (off + n > sizeof nor) return -1; memcpy(dst, nor + off, n); return 0; }
+static int st_erase(uint32_t off) { if (off + 4096u > sizeof nor || (off & 4095u)) return -1; memset(nor + off, 0xFF, 4096); nor_erases++; return 0; }
+static int st_prog(uint32_t off, const void *src, uint32_t n) { uint32_t i; if (off + n > sizeof nor) return -1; for (i = 0; i < n; i++) nor[off + i] &= ((const uint8_t *)src)[i]; return 0; }
+#define ST_XIP_PTR(off) (nor + (off))
 #include "../firmware/src/storage.c"
+#define FELUCCA_FLASH 1
+static uint8_t flash_ok = 1;
+static int audio_quiet(void) { return 1; }
+#include "../firmware/src/pb_store.c"
 
 static const char *outdir;
 static int fails;
@@ -129,6 +136,7 @@ int main(int argc, char **argv)
     panel = PANEL_DEFAULT;
     settings.palette = 4;
     palette_set(4);
+    memset(nor, 0xFF, sizeof nor);
     host_tracks_init();
     for (i = 0; i < NPART; i++) { set_engine_of(&trk[i], TRK_DEF[i][0]); apply_preset_to(&trk[i], TRK_DEF[i][1]); trk[i].engine = trk[i].eng_req; }
     TDRUM->p[P_E0] = DRUM_DEFAULT_KIT;
@@ -305,6 +313,78 @@ int main(int argc, char **argv)
         turn(EN_K2, -1); check(pu.c_item == CI_NEW, "SETUP: NEW SKETCHBOOK");
         tap(B_SAVE); frames(4); check(!pb.have && !steps_used(0) && !steps_used(TRK_DRUM), "NEW: the tracks are empty, no sketch");
         tap(B_HOME);
+    }
+
+    /* 0.3: morph, the build and the drop, the chain, skins, the run, the sketch remembered */
+    pb_travel(0, 2, 3, 777u); frames(4); tap(B_HOME);
+    {   step_t keep[NSTEP]; memcpy(keep, trk[0].step, sizeof keep);
+        tap(B_LFO); for (i = 0; i < 6u; i++) turn(EN_K3, 1);
+        check(pb.morph == 6 && memcmp(keep, trk[0].step, sizeof keep) && on_scale(), "JAM: KNOB 3 MORPH leans the parts to their next idea, in key");
+        for (i = 0; i < 6u; i++) turn(EN_K3, -1);
+        check(pb.morph == 0 && !memcmp(keep, trk[0].step, sizeof keep), "MORPH back to 0: the parts as they were");
+    }
+    {   dstep_t keep[NSTEP]; int16_t f0 = song.g[G_FILT]; uint32_t rolled = 0, hi = 0;
+        memcpy(keep, TDRUM->dstep, sizeof keep);
+        trk[2].p[P_MUTE] = 1;
+        tap(B_FX); tap(B_FX);
+        check(pu.b_on == 1, "PERFORM: FX again arms the build");
+        for (i = 0; i < 700u && pu.b_on; i++) { frame(); if (pu.b_on == 2u) { rolled |= memcmp(keep, TDRUM->dstep, sizeof keep) != 0 && trk[0].p[P_MUTE]; if (song.g[G_FILT] > hi) hi = (uint32_t)song.g[G_FILT]; } }
+        check(rolled && hi > 20u, "the build: a roll on the drums, the bass out, the filter rising");
+        check(!pu.b_on && !memcmp(keep, TDRUM->dstep, sizeof keep) && song.g[G_FILT] == f0 && !trk[0].p[P_MUTE] && !trk[2].p[P_MUTE], "the drop: the drums back, the filter as it was, everyone awake");
+        tap(B_FX); press(B_PLAY); release(B_PLAY); frames(6);
+        check(!song.playing && !pu.b_on && !memcmp(keep, TDRUM->dstep, sizeof keep), "a build armed, then STOP: nothing left changed");
+        press(B_PLAY); release(B_PLAY); frames(6); tap(B_HOME);
+    }
+    {   tap(B_SAVE); while (pu.c_page != 1u) turn(EN_K1, 1);
+        slot_used = 0; pu.c_slot = 0; pu.c_act = 0; tap(B_SAVE); turn(EN_K2, 1); tap(B_SAVE);
+        turn(EN_K3, 1); turn(EN_K3, 1); check(pu.c_act == 2, "SLOTS: the third action is CHAIN");
+        tap(B_SAVE); check(chain_n == 2 && chain_sec[0] == 0 && chain_sec[1] == 1, "CHAIN: the stored slots play in turn");
+        frames(3); ppm("pb-cart-chain");
+        fm1_irq_off(); chain_n = 0; fm1_irq_on();
+        while (pu.c_page != 2u) turn(EN_K1, 1);
+        while (pu.c_item != CI_SKIN) turn(EN_K2, pu.c_item < CI_SKIN ? 1 : -1);
+        { uint16_t bg = pbc[0]; turn(EN_K3, 1); check(pb.skin == 1 && pbc[0] != bg, "SETUP: SKIN changes the colours"); frames(2); tap(B_HOME); frames(3); ppm("pb-skin-pea");
+          tap(B_SAVE); turn(EN_K3, -1); check(pb.skin == 0 && pbc[0] == bg, "and back"); tap(B_HOME); }
+    }
+    {   /* the run */
+        uint32_t n;
+        tap(B_ARP); while (pu.v_mode != 3u) tap(B_ARP);
+        check(layer_now() == LY_MIX, "VISUALS > RUN: the keys play no notes");
+        tap(B_ARP); check(pu.r_on == 1 && pu.r_lives == 3, "ARP starts the run");
+        frames(4); ppm("pb-run");
+        for (n = 0; n < 1500u && pu.r_on == 1u; n++) frame();
+        check(pu.r_on == 2 && !pu.r_lives && trk[2].p[P_MUTE] && trk[1].p[P_MUTE] && trk[0].p[P_MUTE], "untouched: three misses, the band asleep one by one, game over");
+        frames(2); ppm("pb-run-over");
+        fm1_in.notes = 1u << 20; frame(); fm1_in.notes = 0; frame();
+        check(pu.r_on == 1 && pu.r_lives == 3 && !trk[0].p[P_MUTE], "any key: again, everyone awake");
+        for (n = 0; n < 900u && pu.r_on == 1u; n++) {         /* a player who reads the track: the right key just before each step */
+            uint32_t p = rn_pos(), s = (p >> 8) + 1u, k = rn_kind(s);
+            static uint32_t done;
+            if (k && done != s && s * 256u - p < 200u) { done = s; fm1_in.notes = k == 1u ? 1u << 20 : 1u << 2; frame(); fm1_in.notes = 0; }
+            frame();
+        }
+        printf("pb: run: score %u, combo %u, lives %u\n", pu.r_score, pu.r_combo, pu.r_lives);
+        check(pu.r_on == 1 && pu.r_lives == 3 && pu.r_score > 200, "played right: no miss, the score climbs");
+        frames(2); ppm("pb-run-play");
+        tap(B_HOME); check(layer_now() == LY_PLAY && !pu.r_on, "leaving: the keys play again");
+    }
+    {   /* the sketch remembered: stop, leave it alone, switch off and on */
+        pb_song_t s0; uint8_t idea0[4]; uint32_t e0;
+        sel(0); turn(EN_K1, 1); turn(EN_K2, 1);
+        s0 = pb.s; memcpy(idea0, pb.idea, 4); e0 = pb.energy; nor_erases = 0;
+        press(B_PLAY); release(B_PLAY); frames(8);
+        check(!song.playing, "stopped");
+        frames(260);
+        check(nor_erases == 1, "left alone a few seconds, stopped: the sketch is written to the flash, once");
+        frames(400); check(nor_erases == 1, "nothing changed: nothing written again");
+        memset(&pb.s, 0, sizeof pb.s); memset(pb.idea, 0, 4); pb.have = 0; pb.energy = 12; pb.skin = 3;
+        pb_store_boot();
+        check(pb.have && !memcmp(&pb.s, &s0, sizeof s0) && !memcmp(pb.idea, idea0, 4) && pb.energy == e0 && pb.skin == 0 && pb.fit[0] >= 40, "power on: the sketch, the ideas, the energy and the skin are back");
+        { step_t keep[NSTEP]; memcpy(keep, trk[0].step, sizeof keep); turn(EN_K1, 1); turn(EN_K1, -1);
+          check(!memcmp(keep, trk[0].step, sizeof keep), "and the IDEA knob goes on from where it was"); }
+        nor[0xF9000 + 300] ^= 0x55; nor[0xFA000 + 300] ^= 0x55; pb.have = 0;
+        pb_store_boot(); check(!pb.have, "a damaged record is not taken");
+        pb_travel(0, 0, 0, 5u); frames(4);
     }
 
     /* every town, pure and blended: in scale, audible, not clipping */

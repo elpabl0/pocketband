@@ -4,7 +4,7 @@
  * drawing or knobs. Loading a sound, the factory sound list by kind, undo, a new project, the device's
  * button calibration. Taken from SLOOP 2.8.5's ui.c / ui_input.c / ui_layers.c with the screens removed. */
 #ifndef FELUCCA_VERSION
-#define FELUCCA_VERSION "POCKET BAND 0.2"
+#define FELUCCA_VERSION "POCKET BAND 0.3"
 #endif
 static void project_save(uint32_t slot);
 static void arrangement_save(void);
@@ -405,6 +405,7 @@ UI_SMALL static void layers_init(void)
 {
     memset(ly_bit, 0, sizeof ly_bit);
     ly_bit[LY_FX] = PB_FX_BIT;
+    ly_bit[LY_MIX] = PB_FX_BIT << 1;                     /* (the run: the keys play no notes, locked the same way) */
     dyn_bit[0] = 1u << panel.btn[B_OCTDN];               /* the drum track: OCT- held a ghost hit, OCT+ a hard one */
     dyn_bit[1] = 1u << panel.btn[B_OCTUP];
     ft_btn_mask = 1u << panel.btn[B_REC];
