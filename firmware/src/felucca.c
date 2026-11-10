@@ -181,14 +181,12 @@ static void ota_commit(const uint8_t *parm)
     fm1_enter_update(parm);                             /* record into RAM, core reset (fm1_sys.h) */
 }
 #endif
-#if FELUCCA_OTA
-#include "editor.c"          /* web editor SysEx (needs the OTA SysEx plumbing) */
-#endif
+static void ed_service(void) {}   /* Pocket Band: SLOOP's web editor protocol is not built (its pages describe SLOOP's screens) */
 #if FELUCCA_CDC
 #include "console.c"
 #endif
 #if FELUCCA_OTA
 #include "recovery.c"        /* early, polled USB updater; no synth or settings */
 #endif
-#include "splash.c"          /* SLOOP boot logo (build/gen/sloop_logo.h) */
+/* (the boot screen: pb_ui.c) */
 #include "main.c"

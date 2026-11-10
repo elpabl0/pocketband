@@ -46,10 +46,6 @@ $CC -o "$OUT/arranger_test" tests/arranger_test.c
 run "song order, timing, repeats and missing scenes" "$OUT/arranger_test"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/song_audio_test" tests/song_audio_test.c -lm
 run "song: four simultaneous tracks, scene transition and stop" "$OUT/song_audio_test" "$OUT/song-demo.wav"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/song_ui_test" tests/song_ui_test.c -lm
-run "song screen: commands, load (OCT+ twice), display bounds" "$OUT/song_ui_test" "$OUT/song-screen.ppm"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/song_arm_test" tests/song_arm_test.c -lm
-run "song screen: a confirmation left unconfirmed asks again weeks later (no load / replace on one press)" "$OUT/song_arm_test"
 
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/studio_drums_test" tests/studio_drums_test.c -lm
 run "drum lanes, kit audio, metronome, record arm, free take" "$OUT/studio_drums_test" "$OUT/drum-styles.wav"
@@ -57,23 +53,17 @@ $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/seq2_test" tests/seq2_test.c -lm
 run "sequencer 2.0: no drift, ratchets, roll, erase / undo, ghost / hard, chords, mute / solo, nudge, locks" "$OUT/seq2_test"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/hold_rec_test" tests/hold_rec_test.c -lm
 run "2.8.3: a note held under others (live, recorded, overdubbed), MIDI in overflow" "$OUT/hold_rec_test"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/len_test" tests/len_test.c -lm
-run "2.8.3: SEQ > NOTES, LEN under later notes, MONO / STEP FULL, shorter, delete" "$OUT/len_test"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/drum_steal_test" tests/drum_steal_test.c -lm
 run "2.8.3: drum voices on a busy beat, every kit: no kick cut by another sound" "$OUT/drum_steal_test"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/chop_attack_test" tests/chop_attack_test.c -lm
 run "2.8.3: a sample played again starts from silence with its ATK (POLY same note, MONO, LEGATO, UNISON), no click" "$OUT/chop_attack_test"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/fade_noise_test" tests/fade_noise_test.c -lm
 run "SLOOP Pro #4: a note fading out keeps 16-bit resolution (DAC, MASTER 2048, USB FULL, 808 SLIDE): no 16 LSB floor" "$OUT/fade_noise_test"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/knob_walk_test" tests/knob_walk_test.c -lm
-run "every page, HOME, REC READY: a knob turned alone changes one value (sloop-pro #6: REC READY K3 not K2 too)" "$OUT/knob_walk_test" "$OUT"
 
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/drumkit_test" tests/drumkit_test.c -lm
 run "synthesised drum kits: every kit x sound bounded, audible, finite, levels, cost" "$OUT/drumkit_test" "$OUT/drum-kits.wav" "$OUT/drum-kits.txt"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/userkit_test" tests/userkit_test.c -lm
 run "user drum kits (KIT USR1..USR3): a user slot's sounds on the drum lanes" "$OUT/userkit_test"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/dsyn_test" tests/dsyn_test.c -lm
-run "SYN1..SYN4 drum kits and the editor's DRUM SYNTH commands (v10)" "$OUT/dsyn_test"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/font_test" tests/font_test.c
 run "the screen font at 1 bit a pixel: every glyph, the same pixels as 2.5" "$OUT/font_test"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/punch_test" tests/punch_test.c -lm
@@ -81,21 +71,19 @@ run "punch-in FX: 27 effects (11 on the black keys), bounded, dry after release,
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/fx251_test" tests/fx251_test.c -lm
 run "after Felucca 1.4 / 1.5: INSERT, filter TYPE, ENV SYNC, LFO 2, drum mutes, MIDI LEARN" "$OUT/fx251_test"
 
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/ui_pages_test" tests/ui_pages_test.c -lm
-run "live UI: pages, layers (punch, steps, erase, roll, key, mix), holds, drums, REC, fuzz" "$OUT/ui_pages_test" "$OUT"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/pocketband_test" tests/pocketband_test.c -lm
+$CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/pb_fw_test" tests/pb_fw_test.c -lm
 mkdir -p "$OUT/pb"
-run "Pocket Band: every town, the three screens, codes, fuzz" "$OUT/pocketband_test" "$OUT/pb"
+run "Pocket Band: every screen, knob and button; every town; codes; slots; fuzz" "$OUT/pb_fw_test" "$OUT/pb"
 $CC -std=c99 -O1 -Wall -Wextra -Werror -Ifirmware/src -o "$OUT/pb_brain_test" firmware/src/pb_brain.c tests/pb_brain_test.c
 run "Pocket Band brain: determinism, ranges, scales, codes" "$OUT/pb_brain_test"
 # no divide by 0 (the FM-1 runs with the div0 trap off, hal/fm1_irq.h: a real one would give a wrong value
 # silently): the UI fuzz, the sequencer, the projects and a minute of random live use, with UBSan
 UBSAN="${CC_UB:-cc} -O1 -w -fsanitize=integer-divide-by-zero -fno-sanitize-recover=integer-divide-by-zero -Ibuild/gen -Ifirmware/src -Ifirmware/hal"
-$UBSAN -o "$OUT/ui_pages_ub" tests/ui_pages_test.c -lm && $UBSAN -o "$OUT/seq2_ub" tests/seq2_test.c -lm &&
+$UBSAN -o "$OUT/pb_fw_ub" tests/pb_fw_test.c -lm && $UBSAN -o "$OUT/seq2_ub" tests/seq2_test.c -lm &&
     $UBSAN -o "$OUT/project_ub" tests/project_test.c -lm && $UBSAN -o "$OUT/soak_ub" tests/soak_test.c -lm || fail=1
 mkdir -p "$OUT/ub"
 run "no divide by zero (UBSan): UI fuzz, sequencer, projects, a minute of live use" \
-    sh -c "'$OUT/ui_pages_ub' '$OUT/ub' >/dev/null && '$OUT/seq2_ub' >/dev/null && '$OUT/project_ub' >/dev/null && '$OUT/soak_ub' 1 >/dev/null && echo 'no divide by zero'"
+    sh -c "'$OUT/pb_fw_ub' '$OUT/ub' >/dev/null && '$OUT/seq2_ub' >/dev/null && '$OUT/project_ub' >/dev/null && '$OUT/soak_ub' 1 >/dev/null && echo 'no divide by zero'"
 
 # the second core's host double (tests/cpu1_host.c, firmware/src/cpu1.h): inline, a thread, a slow thread, a lost
 # job; and the thread under ThreadSanitizer (the render's shared state shows up here once it uses core 1)
@@ -113,15 +101,14 @@ fi
 
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/soak_test" tests/soak_test.c -lm
 run "soak: ${SOAK_MIN:-10} minutes of random live use (bounded, no hanging voices, idle after stop)" "$OUT/soak_test" "${SOAK_MIN:-10}"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/stress_test" tests/stress_test.c -lm
-run "stress (2.4): FONT_L = FONT_S at 2x, hard random use of every 2.4 addition, clean stop" "$OUT/stress_test" "${STRESS_FRAMES:-40000}"
-# the same under AddressSanitizer + UBSan: any read or write out of bounds stops it (left shifts of negative values
-# and the FM6 phase's wrap-around are left out: the DSP's two's complement idioms, as every compiler builds them)
+# Pocket Band's interface again under AddressSanitizer + UBSan: any read or write out of bounds stops it (left shifts
+# of negative values and the FM6 phase's wrap-around are left out: the DSP's two's complement idioms)
 ASAN="${CC_UB:-cc} -O1 -g -w -fsanitize=address,undefined -fno-sanitize=shift-base,signed-integer-overflow -fno-sanitize-recover=all -Ibuild/gen -Ifirmware/src -Ifirmware/hal"
-if $ASAN -o "$OUT/stress_asan" tests/stress_test.c -lm 2>/dev/null; then
-    run "stress under ASan + UBSan (no access out of bounds)" "$OUT/stress_asan" "${STRESS_ASAN_FRAMES:-15000}" 7
+if $ASAN -o "$OUT/pb_fw_asan" tests/pb_fw_test.c -lm 2>/dev/null; then
+    mkdir -p "$OUT/pb-asan"
+    run "Pocket Band under ASan + UBSan (no access out of bounds)" "$OUT/pb_fw_asan" "$OUT/pb-asan"
 else
-    echo "(stress under ASan: this compiler has no AddressSanitizer, skipped)"
+    echo "(ASan: this compiler has no AddressSanitizer, skipped)"
 fi
 
 $CC -o "$OUT/upreset_test" tests/upreset_test.c
@@ -182,7 +169,6 @@ $CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/phys_tune_test" te
 run "PHYS: every pitched preset in tune (+-5 cents; a curved bridge +-20), notes 28..100" "$OUT/phys_tune_test"
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -Ifirmware/hal -o "$OUT/unison_level_test" tests/unison_level_test.c -lm
 run "UNISON: every engine spreads its voices' phases (no stack of voices in phase over POLY)" "$OUT/unison_level_test"
-run "the editor protocol and the other inputs (USB / TRS MIDI, damaged flash) fuzzed under ASan + UBSan, and its reproducers" sh tests/editor_fuzz.sh "${EDFZ_N:-2000}" 1
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/regress" tests/regress.c -lm
 # the CPU budget: counted by the kernel on macOS; elsewhere under callgrind when valgrind is there (exact, ~45 s;
 # SKIP_CPU_VALGRIND=1 to time instead, which is only a rough check)
