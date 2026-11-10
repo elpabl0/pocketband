@@ -86,6 +86,7 @@ static void settings_save(void) {}
 #include "../firmware/src/ui_vis.c"
 #include "../firmware/src/ui_layers.c"
 #include "../firmware/src/ui_menu.c"
+#include "../firmware/src/pocketband.c"
 #include "../firmware/src/ui_input.c"
 #include "../firmware/src/splash.c"
 /* (2.7) the theme's CRC: storage.c's st_crc32 (its flash hooks unused here) */
@@ -144,7 +145,11 @@ static void check(int ok, const char *what) { printf("ui: %-74s %s\n", what, ok 
 static const char *sub_line(void) { return layer_sub_shown; }   /* the layer's sub line as last drawn (ui_layers.c) */
 
 #ifndef UI_PAGES_HARNESS_ONLY                       /* (tests/stress_test.c: the harness, its own main) */
+#ifdef UI_PAGES_AS_LIB                       /* (tests/pocketband_test.c builds on this harness) */
+static int ui_pages_main(int argc, char **argv)
+#else
 int main(int argc, char **argv)
+#endif
 {
     uint32_t i;
     outdir = argc > 1 ? argv[1] : "build/host";
@@ -1456,7 +1461,9 @@ int main(int argc, char **argv)
         transport_req = 1; frames(30);
         check(!vis_shown(), "visualiser: closed on the TRACKS screen");
         tap(B_HOME); frames(2);
-        check(vis_shown() && vis_on, "visualiser: HOME on HOME opens it");
+        check(pb_shown() && !vis_on, "HOME on HOME opens Pocket Band first");
+        tap(B_HOME); frames(2);                     /* (HOME again: on to the visualiser) */
+        check(vis_shown() && vis_on, "visualiser: HOME on HOME, twice, opens it");
         vis_style = 0; ui.force = 1;
         for (st = 0; st < 12u; st++) {
             char nm[80];
@@ -1497,6 +1504,8 @@ int main(int argc, char **argv)
         tap(B_HOME); frames(2);
         check(!vis_shown() && !vis_on, "visualiser: HOME again closes it");
         tap(B_HOME); frames(2);
+        tap(B_HOME); frames(2);                     /* (Pocket Band, then the visualiser) */
+        check(vis_shown(), "visualiser: open again");
         tap(B_LFO); frames(2);
         check(!vis_shown() && !vis_on && !strcmp(PAGES[ui.page].title, "LFO"), "visualiser: a page button closes it and opens its page");
         transport_req = 2; frames(4);

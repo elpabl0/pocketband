@@ -68,6 +68,7 @@
 #include "ui_vis.c"           /* the full-screen visualiser (HOME on HOME, 2.4) */
 #include "ui_layers.c"       /* hold a function button: what the keys and knobs do (TE style) */
 #include "ui_menu.c"
+#include "pocketband.c"      /* Pocket Band: the generator overlay (HOME on TRACKS) */
 #include "ui_input.c"
 #ifndef FELUCCA_FLASH
 #define FELUCCA_FLASH 1          /* flash driver + storage.c */

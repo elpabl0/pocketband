@@ -1188,6 +1188,15 @@ UI_SMALL static void ui_input(void)
             panel_enc(EN_K1 + k);
         enc_hold |= 15u << EN_K1;
     }
+    if (pb_shown() && !rec_wait && !ft_on) {            /* Pocket Band: its own knobs and buttons */
+        uint32_t mine = 1u << panel.btn[B_PLAY] | 1u << panel.btn[B_OCTDN] | 1u << panel.btn[B_OCTUP] | 1u << panel.btn[B_HOME];
+        if (!(pressed & ~mine)) {
+            pb_input(pressed, home == BT_TAP);
+            return;
+        }
+        pb.on = 0;                                      /* a page button: Pocket Band closes, its page opens (below) */
+        ui.force = 1;
+    }
 #if FELUCCA_ARRANGER
     if (on_song_page()) {
         song_screen_input(pressed, home);
@@ -1199,8 +1208,10 @@ UI_SMALL static void ui_input(void)
     }
 #endif
     if (home == BT_TAP) {                               /* HOME acts on release: a hold opens the menu */
-        if (!ui.home && cur_page()->scope == SC_TRK && !vis_on)
-            vis_open();                                 /* HOME on HOME: the visualiser (ui_vis.c) */
+        if (!ui.home && cur_page()->scope == SC_TRK && !vis_on) {
+            pb.on = 1;                                  /* HOME on HOME: Pocket Band, then (HOME again) the visualiser */
+            ui.force = 1;
+        }
         else {
             vis_on = 0;                                 /* (HOME again: back to the TRACKS screen) */
             go_home();

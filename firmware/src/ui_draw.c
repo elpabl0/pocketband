@@ -1047,6 +1047,9 @@ UI_SMALL static void ui_timers(void)
 }
 
 static void vis_draw(void);                     /* ui_vis.c */
+UI_SMALL static void pb_draw(void);             /* pocketband.c */
+static int pb_shown(void);
+static int pb_left(void);
 static int vis_shown(void);
 static uint8_t vis_on, vis_shown_last, vis_name_t;   /* the visualiser (ui_vis.c): on, drawn last frame, its name's time */
 UI_SMALL static void ui_draw(void)
@@ -1113,6 +1116,16 @@ UI_SMALL static void ui_draw(void)
         ui_timers();
         ui.force = 0;
         return;
+    }
+    if (pb_shown()) {                                   /* Pocket Band over the TRACKS screen */
+        pb_draw();
+        ui_timers();
+        ui.force = 0;
+        return;
+    }
+    if (pb_left()) {
+        lcd_fill(0, 0, 240, 240, C_BLACK);
+        ui.force = 1;
     }
     if (vis_shown()) {                                  /* the visualiser over the TRACKS screen */
         vis_draw();

@@ -86,6 +86,7 @@ static void settings_save(void) {}
 #include "../firmware/src/ui_vis.c"
 #include "../firmware/src/ui_layers.c"
 #include "../firmware/src/ui_menu.c"
+#include "../firmware/src/pocketband.c"
 #include "../firmware/src/ui_input.c"
 #include "../firmware/src/splash.c"
 /* (2.7) the theme's CRC: storage.c's st_crc32 (its flash hooks unused here) */

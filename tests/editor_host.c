@@ -57,6 +57,7 @@ static uint32_t scope_w;
 #include "../firmware/src/ui_vis.c"
 #include "../firmware/src/ui_layers.c"
 #include "../firmware/src/ui_menu.c"
+#include "../firmware/src/pocketband.c"
 #include "../firmware/src/ui_input.c"
 /* ---- felucca.c's flash part, on the RAM image (as hal/fm1_flash.h: ranges, one page a program) */
 #define FL_DATA_LO 0x00097000u
