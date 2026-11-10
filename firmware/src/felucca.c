@@ -60,16 +60,7 @@
 #include "audio.c"
 #include "cpu1.c"           /* the second core: boot, self-test, state (ABOUT, console) */
 #include "panel.c"
-#include "ui.c"
-#include "ui_song.c"
-#include "ui_studio.c"
-#include "icons.c"           /* parameter icons (FELUCCA_ICONS), used by ui_draw.c */
-#include "ui_draw.c"
-#include "ui_vis.c"           /* the full-screen visualiser (HOME on HOME, 2.4) */
-#include "ui_layers.c"       /* hold a function button: what the keys and knobs do (TE style) */
-#include "ui_menu.c"
-#include "pocketband.c"      /* Pocket Band: the generator overlay (HOME on TRACKS) */
-#include "ui_input.c"
+#include "pb_ui.c"           /* Pocket Band: the whole interface */
 #ifndef FELUCCA_FLASH
 #define FELUCCA_FLASH 1          /* flash driver + storage.c */
 #endif
