@@ -1,5 +1,7 @@
 # Pocket Band
 
+![Three Pocket Band screens: the map, the stage and the run](assets/card/screens.png)
+
 A firmware for the M-VAVE FM-1 that writes music with you. Pick a place on a map of genre towns and it
 writes a four-piece sketch (drums, bass, keys, lead) in one key and tempo, with sounds to match. Then
 re-roll any member, audition replacements, change the key, let the band jam, play punch-in effects on
@@ -9,11 +11,12 @@ the keys, edit any part step by step, and keep what you like in four save slots.
 on a computer against the real sound engines and sequencer (see Tests), not yet on the device. Install at
 your own risk.
 
-Pocket Band is its own firmware with its own interface. Underneath, the sound engines, sequencer,
-storage, USB and hardware drivers are those of [SLOOP 2.8.5](https://github.com/isod89/sloop-fm1) by
-isod89, which is based on [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton
-Instruments). None of SLOOP's screens remain, and SLOOP's web editor does not talk to this firmware.
-SLOOP's own README is kept as [SLOOP-README.md](SLOOP-README.md) for reference on the engines.
+Pocket Band has its own interface and its own music generator. Its sound engines, sequencer, storage,
+USB and hardware drivers come from [SLOOP 2.8.5](https://github.com/isod89/sloop-fm1) by isod89, which
+is based on [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton Instruments).
+See [CREDITS.md](CREDITS.md).
+
+**[How to use it](GUIDE.md)** · **[A demo to run through](DEMO.md)** · **[Changes](CHANGELOG.md)**
 
 ## How it works
 
@@ -70,25 +73,48 @@ Notes on a few screens:
 
 ## Install
 
-Open the installer page from a release in Chrome or Edge on a computer, connect the FM-1 with a USB-C
-data cable (no hub), and press INSTALL. If the FM-1 does not start afterwards, hold OCT− alone while
-switching it on (USB rescue) and install again. To leave, install SLOOP from its own page, or the
-original firmware with M-VAVE's M-UPGRADE.
+1. Download `pocket-band-installer.html` from the [latest release](https://github.com/elpabl0/pocketband/releases/latest)
+   and open it in Chrome or Edge on a computer.
+2. Connect the FM-1 with a USB-C data cable, straight to the computer.
+3. Press INSTALL and leave the FM-1 alone until the page says it is done.
 
-Saved data: Pocket Band keeps SLOOP's storage format, so slots and settings survive moving between
-the two. The sketch's own record sits in the last 8 KB of SLOOP's fourth user-sample slot, which Pocket
-Band does not otherwise use; a sample there longer than 72 KB would lose its tail. A slot holds notes
-and sounds, not the generator's state: a loaded slot plays and can be edited, but its IDEA and ENERGY
-knobs belong to the last sketch you travelled to.
+The release also has the bare package, `pocketband.fwsc`, for other installers.
+
+**If the FM-1 does not start afterwards:** switch it off, hold OCT− alone and switch it on (USB rescue),
+then install again.
+
+**To leave:** install any other firmware the usual way, for instance SLOOP from its own page, or the
+original firmware with M-VAVE's M-UPGRADE. While stopped, holding OCT− and OCT+ together for five
+seconds puts the FM-1 in update mode.
+
+### What it does to data already on the FM-1
+
+- Pocket Band **cannot open** projects or samples of the original M-VAVE firmware or of firmwares outside
+  the Felucca family.
+- It uses the **same flash areas and formats as SLOOP** for the four project slots and
+  the settings. Slots saved with SLOOP load as plain notes and sounds, and Pocket Band **overwrites** a
+  slot when you store to it. Back up with the other firmware's own tool before installing.
+- Its own sketch record sits in the last 8 KB of SLOOP's fourth user-sample slot. A sample there longer
+  than 72 KB loses its tail.
+- It does not load user samples.
+
+### On USB
+
+The package identity is `FM-1_7226` followed by the version's two digits (0.4: `FM-1_722604`). The
+MIDI port is named **Felucca**, and the update loader is Felucca's, unchanged (**Felucca Update**,
+`ota-FM-1_900`), so installers that know SLOOP or Felucca find the FM-1 and can resume an interrupted
+update. Both flash chips the FM-1 ships with are accepted (P25Q80 and UC25HQ80).
 
 ## Build
 
-Linux x86-64 (or Docker / WSL), the JieLi toolchain and three SDK files: see [BUILDING.md](BUILDING.md).
+Linux x86-64 (or Docker), the JieLi toolchain and three SDK files: see [BUILDING.md](BUILDING.md).
 
 ```sh
 sh build.sh
-python3 tools/make_pocketband_installer.py . build/felucca.fwsc pocket-band-installer.html
 ```
+
+makes `build/pocketband.fwsc` (the package) and `build/pocket-band-installer.html` (the package inside
+a page that installs it).
 
 ## Tests
 
@@ -108,11 +134,13 @@ python3 tools/make_pocketband_installer.py . build/felucca.fwsc pocket-band-inst
 - `firmware/src/pb_ui.c`: every screen, the buttons, the LEDs, the boot screen.
 - `firmware/src/pb_store.c`: the sketch kept across power-off.
 - `firmware/src/pb_core.c`: sound loading, undo, calibration (taken from SLOOP's interface code).
-- Everything else under `firmware/` is SLOOP / Felucca.
+- Everything else under `firmware/` is SLOOP's and Felucca's code. File and macro names there keep
+  `felucca` / `FELUCCA_`; comments that say where a piece came from are left as they were.
+- `web/`, `tools/`: the installer page, the update protocol in JavaScript and Python, the build.
 - `prototype/`: the browser prototype the design started from.
 
 ## Licence
 
-GPL-3.0-only, as SLOOP and Felucca; see [LICENSE](LICENSE), [LICENSING.md](LICENSING.md) and
-`LICENSES/`. "M-VAVE" and "FM-1" are trademarks of their owners; this is independent firmware, not
+GPL-3.0-only, as SLOOP and Felucca; see [LICENSE](LICENSE), [LICENSING.md](LICENSING.md),
+[CREDITS.md](CREDITS.md) and `LICENSES/`. "M-VAVE" and "FM-1" are trademarks of their owners; this is independent firmware, not
 affiliated with or supported by them, nor by the SLOOP or Felucca authors.
