@@ -9,45 +9,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pocket Band installer</title>
 <style>
-  :root { --bg: #000; --fg: #f2f2f2; --dim: #8a8a92; --tile: #16161a; --line: #2a2a30;
-          --blue: #287cff; --green: #1ecc70; --yellow: #ffc618; --orange: #ff621a; --red: #ff2c34; }
-  :root[data-theme="light"] { --bg: #f4f4f2; --fg: #111; --dim: #666; --tile: #e6e6e2; --line: #d0d0cc; }
+  /* the firmware's MIDNIGHT skin (firmware/src/pb_band.c PB_SKIN[0]) */
+  :root { --bg: #0b1020; --dim: #1f2a4d; --mid: #4a5fa8; --soft: #8fa0dc; --ink: #dfe7ff; --hot: #ff5d8f; --gold: #ffd166;
+          --mint: #4de0c0; --white: #fff; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg);
-         font: 15px/1.6 "Helvetica Neue", -apple-system, BlinkMacSystemFont, Arial, sans-serif; }
-  main { max-width: 560px; margin: 0 auto; padding: 32px 16px 48px; }
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .logo { font: 700 40px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; }
-  .logo span { color: var(--red); }
-  .strip { display: flex; height: 4px; margin: 20px 0 24px; }
-  .strip i { flex: 1; } .strip i:nth-child(1) { background: var(--blue); } .strip i:nth-child(2) { background: var(--green); }
-  .strip i:nth-child(3) { background: var(--yellow); } .strip i:nth-child(4) { background: var(--orange); }
-  h1 { font-size: 13px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; }
-  .lead { font-size: 20px; line-height: 1.35; margin: 0 0 24px; }
-  .box { border: 2px solid var(--yellow); padding: 14px 16px; margin: 18px 0; border-radius: 6px; }
-  .box h2 { margin: 0 0 8px; font-size: 17px; color: var(--yellow); }
-  .box ol { margin: 0 0 10px; padding-left: 22px; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.6 ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+  main { max-width: 600px; margin: 0 auto; padding: 0 16px 48px; }
+  .bar { display: flex; justify-content: space-between; gap: 12px; background: var(--gold); color: var(--bg);
+         font-weight: 700; letter-spacing: .08em; padding: 6px 12px; margin: 0 -16px; text-transform: uppercase; }
+  .bar .play { color: var(--hot); }
+  .stage { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 22px 0 14px;
+           border-bottom: 2px dashed var(--dim); margin-bottom: 18px; text-align: center; }
+  .stage canvas { width: 64px; height: 68px; image-rendering: pixelated; display: block; margin: 0 auto 6px; }
+  .stage b { display: block; color: var(--white); letter-spacing: .06em; }
+  .stage span { display: block; color: var(--mid); font-size: 13px; letter-spacing: .06em; }
+  h1 { font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--soft); margin: 0 0 6px; }
+  .lead { font-size: 18px; line-height: 1.45; margin: 0 0 22px; color: var(--white); }
+  .box { border: 2px solid var(--mid); padding: 14px 16px; margin: 18px 0 22px; }
+  .box h2 { margin: -14px -16px 12px; padding: 5px 16px; font-size: 14px; letter-spacing: .1em; text-transform: uppercase;
+            background: var(--mid); color: var(--white); }
+  .box ol { margin: 0 0 10px; padding: 0; list-style: none; counter-reset: n; }
+  .box li { counter-increment: n; position: relative; padding-left: 30px; margin-bottom: 6px; }
+  .box li::before { content: counter(n); position: absolute; left: 0; top: 2px; width: 20px; height: 20px; line-height: 20px;
+                    text-align: center; background: var(--gold); color: var(--bg); font-weight: 700; font-size: 13px; }
+  .box b { color: var(--gold); font-weight: 700; }
   p { margin: 0 0 14px; }
-  button#go { font: 600 15px/1 inherit; font-family: inherit; background: var(--orange); color: #000; border: 0;
-              padding: 16px 0; width: 100%; cursor: pointer; letter-spacing: .08em; text-transform: uppercase; }
-  button#go:disabled { background: var(--tile); color: var(--dim); cursor: default; }
-  #status { margin-top: 14px; min-height: 1.6em; font-variant-numeric: tabular-nums; }
-  .small { color: var(--dim); font-size: 12.5px; }
-  .small a, a { color: inherit; }
-  progress { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; margin-top: 16px; border: 0; background: var(--tile); }
-  progress::-webkit-progress-bar { background: var(--tile); }
-  progress::-webkit-progress-value { background: var(--orange); }
-  progress::-moz-progress-bar { background: var(--orange); }
-  pre { color: var(--dim); font-size: 11px; white-space: pre-wrap; margin-top: 12px; max-height: 160px; overflow: auto; }
-  hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0 18px; }
+  button#go { font: 700 17px/1 inherit; font-family: inherit; background: var(--hot); color: var(--bg); border: 0;
+              padding: 16px 0; width: 100%; cursor: pointer; letter-spacing: .14em; text-transform: uppercase;
+              box-shadow: 4px 4px 0 var(--dim); }
+  button#go:hover:not(:disabled) { background: var(--gold); }
+  button#go:active:not(:disabled) { transform: translate(4px, 4px); box-shadow: none; }
+  button#go:focus-visible { outline: 2px solid var(--white); outline-offset: 3px; }
+  button#go:disabled { background: var(--dim); color: var(--mid); cursor: default; box-shadow: none; }
+  progress { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .energy { display: flex; align-items: center; gap: 10px; margin-top: 20px; color: var(--soft); letter-spacing: .08em; }
+  .energy div { flex: 1; display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; height: 14px; }
+  .energy i { background: var(--dim); } .energy i.on { background: var(--hot); }
+  #status { margin-top: 12px; min-height: 1.6em; color: var(--mint); text-transform: uppercase; letter-spacing: .06em;
+            font-variant-numeric: tabular-nums; }
+  .small { color: var(--soft); font-size: 12.5px; }
+  a { color: inherit; } .small a:hover { color: var(--ink); }
+  pre { color: var(--soft); font: inherit; font-size: 11px; white-space: pre-wrap; margin-top: 12px; max-height: 160px; overflow: auto; }
+  hr { border: 0; border-top: 2px solid var(--dim); margin: 28px 0 18px; }
   [hidden] { display: none !important; }
-  @media (max-width: 420px) { .logo { font-size: 30px; } }
+  @media (max-width: 420px) { .lead { font-size: 16px; } .stage canvas { width: 48px; height: 51px; } }
 </style>
 </head>
 <body>
 <main>
-  <div class="top"><div class="logo">POCKET <span>BAND</span></div></div>
-  <div class="strip"><i></i><i></i><i></i><i></i></div>
+  <div class="bar"><span>POCKET BAND</span><span>INSTALLER <span class="play">&#9654;</span></span></div>
+  <div class="stage" aria-hidden="true">
+    <div><canvas width="16" height="17"></canvas><b>DRUMS</b><span>KIT</span></div>
+    <div><canvas width="16" height="17"></canvas><b>BASS</b><span>BASS</span></div>
+    <div><canvas width="16" height="17"></canvas><b>KEYS</b><span>CHORDS</span></div>
+    <div><canvas width="16" height="17"></canvas><b>LEAD</b><span>LEAD</span></div>
+  </div>
   <h1>Firmware for the M-VAVE FM-1</h1>
   <p class="lead">A band in your FM-1. Pick a place on a map of sixteen genre towns and it writes a four-piece sketch
     in one key and tempo; then re-roll, audition, jam, perform and edit it.</p>
@@ -69,6 +86,7 @@
   <p data-t="warn"></p>
   <p><button id="go" disabled data-t="install"></button></p>
   <progress id="bar" max="100" value="0"></progress>
+  <div class="energy" aria-hidden="true"><span>PROGRESS</span><div id="energy"></div></div>
   <p id="status"></p>
   <pre id="log"></pre>
   <hr>
@@ -131,6 +149,35 @@ const lockAll = (on) => {
   writing = on;
   $("go").disabled = on || !image;
 };
+/* the band, as the firmware draws it (firmware/src/pb_band.c PB_ART: 16 x 16, a nibble a pixel: 1 outline, 2 body,
+ * 3 highlight, 4 shade, 5 eye; in the art's order: bass, keys, lead, drums), and the progress as its ENERGY bar */
+{
+  const ART = ["0000000000000000000000000000000000000111111000000001122222211000001222222222210001223222222222100122222222222210122252222225222112225222222522211222222112222221122222222222222114222222222222410144222222224410001144444444110000001111111100000000000000000000", "0010000000010000012100000012100001221000012210000122211112221000012222222222100001225222252210000122522225221000012222332222100001222222222210100012222222210121001222222221121001222222222221000124222222421000012421111242100001111000011110000000000000000000", "0000000110000000000000122100000000000012210000000111112222111110012222222222221000122522225221000001252222521000000122233222100000122222222221000012222222222100012222211222221001222110011222100121100000011210011000000000011000000000000000000000000000000000", "0000001001000000000000100100000000011111111110000012222222222100001233222233210000123522225321000012222222222100001221111112210000122222222221000001111111111000001142222224110001214222222412100111422222241110000011111111000000001210012100000000111001110000"];
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const band = [[3, "--hot"], [0, "--mint"], [1, "--gold"], [2, "--hot"]];
+  const cv = [...document.querySelectorAll(".stage canvas")];
+  const draw = (i, up) => {
+    const g = cv[i].getContext("2d"), a = ART[band[i][0]];
+    const col = ["", css("--ink"), css(band[i][1]), css("--white"), css("--mid"), css("--ink")];
+    g.clearRect(0, 0, 16, 17);
+    for (let p = 0; p < 256; p++) {
+      const ch = parseInt(a[p], 16);
+      if (ch) { g.fillStyle = col[ch]; g.fillRect(p % 16, (p >> 4) + 1 - up, 1, 1); }
+    }
+  };
+  const seg = [];
+  for (let i = 0; i < 20; i++) seg.push($("energy").appendChild(document.createElement("i")));
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let beat = 0;
+  const frame = () => {
+    const on = Math.round($("bar").value / 5);
+    seg.forEach((s, i) => s.classList.toggle("on", i < on));
+    for (let i = 0; i < 4; i++) draw(i, !still && (writing ? (beat + i) % 2 : beat % 4 === i) ? 1 : 0);
+    beat++;
+  };
+  frame();
+  setInterval(frame, 240);
+}
 window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault(); e.returnValue = t("leave"); } });
 
 (async () => {
