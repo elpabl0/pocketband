@@ -284,7 +284,10 @@ mode. It counts down in the top bar first; let go to cancel.
 ## Good to know
 
 - Four members is the limit; the engines underneath have four tracks.
-- No user samples: this firmware does not talk to SLOOP's web editor.
+- No user samples.
+- Pocket Band cannot open projects or samples of the original M-VAVE firmware. It shares SLOOP's flash
+  areas: slots saved with SLOOP load as notes and sounds, and storing to a slot overwrites it.
 - The sketch's record uses the last 8 KB of SLOOP's fourth user-sample slot. If you had loaded a
   sample longer than 72 KB there with SLOOP, it would lose its tail.
-- To go back: install SLOOP from its own page, or the original firmware with M-VAVE's M-UPGRADE.
+- To go back: install any other firmware the usual way, for instance SLOOP from its own page, or the
+  original firmware with M-VAVE's M-UPGRADE.

@@ -1,0 +1,199 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments (Felucca's installer page)
+     Copyright (C) 2026 the Pocket Band authors
+     Pocket Band's installer page. tools/make_installer.py fills in LIB (web/fm1pkg.js, web/fm1ota.js) and META. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pocket Band installer</title>
+<style>
+  :root { --bg: #000; --fg: #f2f2f2; --dim: #8a8a92; --tile: #16161a; --line: #2a2a30;
+          --blue: #287cff; --green: #1ecc70; --yellow: #ffc618; --orange: #ff621a; --red: #ff2c34; }
+  :root[data-theme="light"] { --bg: #f4f4f2; --fg: #111; --dim: #666; --tile: #e6e6e2; --line: #d0d0cc; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.6 "Helvetica Neue", -apple-system, BlinkMacSystemFont, Arial, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 32px 16px 48px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .logo { font: 700 40px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; }
+  .logo span { color: var(--red); }
+  .strip { display: flex; height: 4px; margin: 20px 0 24px; }
+  .strip i { flex: 1; } .strip i:nth-child(1) { background: var(--blue); } .strip i:nth-child(2) { background: var(--green); }
+  .strip i:nth-child(3) { background: var(--yellow); } .strip i:nth-child(4) { background: var(--orange); }
+  h1 { font-size: 13px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; }
+  .lead { font-size: 20px; line-height: 1.35; margin: 0 0 24px; }
+  .box { border: 2px solid var(--yellow); padding: 14px 16px; margin: 18px 0; border-radius: 6px; }
+  .box h2 { margin: 0 0 8px; font-size: 17px; color: var(--yellow); }
+  .box ol { margin: 0 0 10px; padding-left: 22px; }
+  p { margin: 0 0 14px; }
+  button#go { font: 600 15px/1 inherit; font-family: inherit; background: var(--orange); color: #000; border: 0;
+              padding: 16px 0; width: 100%; cursor: pointer; letter-spacing: .08em; text-transform: uppercase; }
+  button#go:disabled { background: var(--tile); color: var(--dim); cursor: default; }
+  #status { margin-top: 14px; min-height: 1.6em; font-variant-numeric: tabular-nums; }
+  .small { color: var(--dim); font-size: 12.5px; }
+  .small a, a { color: inherit; }
+  progress { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; margin-top: 16px; border: 0; background: var(--tile); }
+  progress::-webkit-progress-bar { background: var(--tile); }
+  progress::-webkit-progress-value { background: var(--orange); }
+  progress::-moz-progress-bar { background: var(--orange); }
+  pre { color: var(--dim); font-size: 11px; white-space: pre-wrap; margin-top: 12px; max-height: 160px; overflow: auto; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0 18px; }
+  [hidden] { display: none !important; }
+  @media (max-width: 420px) { .logo { font-size: 30px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><div class="logo">POCKET <span>BAND</span></div></div>
+  <div class="strip"><i></i><i></i><i></i><i></i></div>
+  <h1>Firmware for the M-VAVE FM-1</h1>
+  <p class="lead">A band in your FM-1. Pick a place on a map of sixteen genre towns and it writes a four-piece sketch
+    in one key and tempo; then re-roll, audition, jam, perform and edit it.</p>
+  <section class="box">
+    <h2>Before you install</h2>
+    <p>Pocket Band is experimental and comes with no warranty. Install it at your own risk.</p>
+    <ol>
+      <li><b>Back up first.</b> If the FM-1 holds anything you want to keep, save it with the tool of the firmware it runs now.
+        Pocket Band does not open other firmwares' projects, and it writes its own over them.</li>
+      <li><b>Connect.</b> A USB-C data cable straight to the computer, no hub. Close any other app or tab that uses MIDI.</li>
+      <li><b>Use Chrome or Edge</b> on a computer, and allow MIDI access when the browser asks.</li>
+      <li><b>Press INSTALL</b> and leave the FM-1 alone until the page says it is done. Do not unplug it.</li>
+      <li><b>Try it.</b> Press GLO for the map, walk with KNOB 1 and KNOB 2, press GLO again to travel.</li>
+    </ol>
+    <p style="margin:0"><b>If the FM-1 does not start afterwards:</b> switch it off, hold OCT&minus; alone and switch it on
+      (USB rescue), then press INSTALL again.</p>
+  </section>
+  <p data-t="intro"></p>
+  <p data-t="warn"></p>
+  <p><button id="go" disabled data-t="install"></button></p>
+  <progress id="bar" max="100" value="0"></progress>
+  <p id="status"></p>
+  <pre id="log"></pre>
+  <hr>
+  <p class="small" data-t="direct"></p>
+  <p class="small"><span data-t="brick"></span>
+    <a href="https://github.com/kurogedelic/FM-1-transporter" target="_blank" rel="noopener">FM-1-transporter</a></p>
+  <p class="small" data-t="back"></p>
+  <p class="small"><a href="https://www.m-vave.com/download" target="_blank" rel="noopener">www.m-vave.com/download</a></p>
+  <p class="small">Pocket Band's sound engines, sequencer, storage and update loader are those of SLOOP 2.8.5 by isod89,
+    which is based on Felucca by Leo Kuroshita (@kurogedelic), <a href="https://hugelton.com" target="_blank" rel="noopener">Hügelton Instruments</a>.<br>
+    Font: Terminus (Dimitar Toshkov Zhekov, SIL OFL 1.1). Samples: Versilian Studios VSCO-2 Community Edition and VCSL, and Sonic Pi (CC0 1.0).<br>
+    M-VAVE and FM-1 are trademarks of their respective owners; Pocket Band is not affiliated with them.<br>
+    <span data-t="license"></span> <a href="https://github.com/elpabl0/pocketband" target="_blank" rel="noopener">github.com/elpabl0/pocketband</a></p>
+</main>
+<script type="module">
+/*LIB*/
+const $ = (id) => document.getElementById(id);
+const TEXT = {
+  en: {
+    intro: "Connect the FM-1 by USB. (Works in Chrome or Edge.)",
+    warn: "Do not unplug the USB cable while writing.",
+    install: "Install",
+    direct: "Connect the USB cable directly to the computer. No probe or Transporter is needed.",
+    brick: "If an install fails and the FM-1 no longer starts, recovering it needs a Transporter:",
+    nomidi: "This browser cannot do it. Open the page in Chrome or Edge.", loadfail: "Could not load: ",
+    start: "Starting", verify: "Verifying", loader: "Switching to update mode", write: "Writing",
+    reboot: "Restarting", done: "Done", stopped: "Stopped. Replug the USB cable and press Install again.",
+    error: "Error: ",
+    denied: "MIDI (SysEx) access was not allowed. Allow MIDI in the site settings (address bar) and press Install again.",
+    notfound: "FM-1 not found. Check the USB cable (a data cable), close other apps that use MIDI, and press Install again.",
+    model: "The connected device is not an FM-1.",
+    lost: "The USB connection was lost. Replug it and press Install again.",
+    noloader: "The FM-1 in update mode was not found. Replug the USB cable and press Install again (it stays in update mode until it is finished).",
+    noreturn: "The FM-1 did not come back. Power-cycle it.",
+    mismatch: "Written, but the FM-1 reports another version: ",
+    foreign: "The FM-1 is in the update mode of another firmware. Finish that update with its own updater (M-UPGRADE), then press Install again: ",
+    badpkg: "The file to install is damaged. Reload the page.",
+    leave: "Writing. Do not close the page.",
+    license: "GPL-3.0, no warranty. Source:",
+    back: "To go back to SLOOP, install it from its own page. To return to the official firmware, use M-VAVE's own updater, M-UPGRADE (Downloads → PC Software → M-UPGRADE), with the official firmware from M-VAVE (PC Firmware → FM-1, V16). If it does not find the FM-1, close every other app and browser tab that uses MIDI; if it still does not, open Clipper's installer page and use its Return to the official firmware (no need to install Clipper).",
+  },
+};
+const lang = "en";
+const t = (k) => TEXT[lang][k];
+let lastKey = null, lastArg = "";
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach((e) => { e.textContent = t(e.dataset.t); });
+  if (lastKey) $("status").textContent = t(lastKey) + lastArg;
+}
+applyLang();
+const sayK = (k, arg = "") => { lastKey = k; lastArg = arg; $("status").textContent = t(k) + arg; };
+const say = (txt) => { lastKey = null; $("status").textContent = txt; };
+const log = (t) => { $("log").textContent += t + "\n"; };
+let image = null;
+const meta = /*META*/;
+
+let writing = false;
+const lockAll = (on) => {
+  writing = on;
+  $("go").disabled = on || !image;
+};
+window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault(); e.returnValue = t("leave"); } });
+
+(async () => {
+  if (!navigator.requestMIDIAccess) { sayK("nomidi"); return; }
+  try {
+    /* never a stale copy: no-cache asks the server first; a mismatch is fetched once more, bypassing the cache */
+    const sha = async (pkg) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", pkg))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const get = async (cache) => {
+      const r = await fetch(meta.pkg, { cache });
+      if (!r.ok) throw new Error(`${meta.pkg}: HTTP ${r.status}`);
+      return new Uint8Array(await r.arrayBuffer());
+    };
+    const check = meta.sha256 && self.crypto && crypto.subtle;
+    let pkg = await get("no-cache");
+    if (check && (await sha(pkg)) !== meta.sha256) pkg = await get("reload");
+    if (productOf(pkg) !== meta.product) { sayK("badpkg"); return; }
+    if (check) {                                       /* a damaged download is never offered (the loader checks its CRC too) */
+      const h = await sha(pkg);
+      if (h !== meta.sha256) { sayK("badpkg"); log(`sha256 ${h}, expected ${meta.sha256}`); return; }
+    }
+    image = logicalImage(pkg);
+    say(`POCKET BAND ${meta.version}: READY TO INSTALL`);
+    lockAll(writing);
+  } catch (e) { sayK("loadfail", e.message); }
+})();
+
+const total = 74 + 1179;                           /* reads: step 1, step 2 (head + app area, SLOOP 2.0 loader) */
+const step = (k, a) => {
+  log(`${k} ${a ?? ""}`);
+  if (k === "start") sayK("start");
+  if (k === "verify") { sayK("verify"); $("bar").value = Math.min(100, (a / total) * 100); }
+  if (k === "loader") sayK("loader");
+  if (k === "write") { sayK("write"); $("bar").value = Math.min(100, ((74 + a) / total) * 100); }
+  if (k === "reboot") sayK("reboot");
+  if (k === "done") { $("bar").value = 100; sayK("done"); }
+};
+const failed = (e) => {
+  if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");
+  else sayK("error", e && e.message);
+  log(String(e && e.stack || e));
+};
+
+$("go").addEventListener("click", async () => {
+  if (writing) return;
+  lockAll(true);
+  let midi;
+  try { midi = await navigator.requestMIDIAccess({ sysex: true }); }
+  catch (e) { sayK("denied"); lockAll(false); return; }
+  try {
+    const up = new Updater(midi, log);
+    const ota = await up.find((id) => /^ota-/i.test(id.model), true);
+    if (ota) {
+      ota.link.close();
+      sayK((await up.resume(image, step)) ? "done" : "stopped");
+    } else {
+      await up.install(image, meta.product, step);
+    }
+  } catch (e) { failed(e); }
+  lockAll(false);
+});
+
+/* Returning to the official firmware is done with M-VAVE's own updater (M-UPGRADE): the in-browser
+   revert was removed because it is not reliable on every system. The note under "stockTitle" points there. */
+</script>
+</body>
+</html>

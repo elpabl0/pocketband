@@ -10,7 +10,7 @@
 #   health          clipping, DC, peak level, voices free after the release, silence at the end.
 #   CPU             cost / sample per preset and mix, relative to the idle + drums mix (tests/cpu_baseline.txt,
 #                   +25 %; counted by the kernel or under callgrind, else timed at +35 %), ns printed;
-#                   target: loop instructions of the render functions in build/felucca.dis
+#                   target: loop instructions of the render functions in build/pocketband.dis
 #                   (tests/target_budget.txt, +10 %; exact, static).
 #   voices          the budget of 8, steal fades, MONO / LEGATO / UNISON keep their note, the VOICE cap,
 #                   no hanging notes on any MIDI / key routing.
@@ -30,7 +30,7 @@ CC="${CC:-cc} -O1 -Wall -Wno-unused-function"
 fail=0
 run() { echo "== $1"; shift; "$@" || fail=1; }
 
-[ -f build/felucca.fwsc ] || { echo "run ./build.sh first"; exit 1; }
+[ -f build/pocketband.fwsc ] || { echo "run ./build.sh first"; exit 1; }
 # the generated headers the FM6 engine needs (tools/build.py generate() makes them too; no Pillow needed)
 mkdir -p build/gen
 [ build/gen/felucca_tables.h -nt tools/gen_tables.py ] || python3 tools/gen_tables.py build/gen/felucca_tables.h
@@ -138,12 +138,12 @@ uac_in_app() { ${CC%% *} -E -Ibuild/gen -Ifirmware/hal -Ifirmware/src firmware/s
 run "USB audio input: built into the firmware (FELUCCA_UAC set before usb.c)" uac_in_app
 
 $CC -o "$OUT/ota_test" tests/ota_test.c
-run "M-UPGRADE entry" "$OUT/ota_test" build/felucca.fwsc
+run "M-UPGRADE entry" "$OUT/ota_test" build/pocketband.fwsc
 
-head -c 200000 build/felucca.bin > "$OUT/old_app.bin"
+head -c 200000 build/pocketband.bin > "$OUT/old_app.bin"
 python3 tools/fm1pkg_make.py "$OUT/old_app.bin" build/loader/ota.bin "$OUT/old.fwsc" >/dev/null
 $CC -o "$OUT/ldr_test" tests/ldr_test.c
-run "update loader: other app -> this build" "$OUT/ldr_test" "$OUT/old.fwsc" build/felucca.fwsc
+run "update loader: other app -> this build" "$OUT/ldr_test" "$OUT/old.fwsc" build/pocketband.fwsc
 
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/hostsim" tests/hostsim.c -lm
 $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/scale_test" tests/scale_test.c -lm
@@ -177,26 +177,18 @@ run "regression: golden renders, health, voices, CPU budget" "$OUT/regress" test
 # SLICE (tests/slice_test.c) needs a FELUCCA_SLICE=1 build; the engine is not built by default
 
 run "regression: target cost of the render loops" python3 tests/target_budget.py \
-    build/felucca.dis tests/target_budget.txt
+    build/pocketband.dis tests/target_budget.txt
 # the render split over the two cores (fx.c mix_units): the golden renders and tests/mix_split_test.c (three
 # FORMANT, FM6 or PHYS parts, S&H LFOs, mutes, the drums through the SLICER and the FILTER, the metronome: every
 # split of the units against none) under every mode of the host double of core 1, and under ThreadSanitizer
 run "the render split over the two cores: every mode of the second core's host double (tests/cpu1_modes.sh)" sh tests/cpu1_modes.sh
 
 run "installer CLI (fm1_install.py) against a simulated FM-1" python3 tests/install_test.py
-run "the offline editor (one file, nothing next to it); the offline site (sw.js, manifest)" python3 tests/site_test.py
 
 if command -v node >/dev/null 2>&1; then
-    run "web pages: editor protocol, samples, packages, update protocol" node web/test_web.mjs
-    rm -rf "$OUT/pwa-site" && python3 web/make_site.py build/felucca.fwsc 2.7 "$OUT/pwa-site" >/dev/null &&
-        run "the site without internet in Chromium (skipped without Playwright)" node tests/pwa_test.mjs "$OUT/pwa-site"
+    run "web: package reading and the update protocol against a simulated FM-1" node web/test_web.mjs
 else
     echo "== skip web tests (no node)"
 fi
 
-# the browser audio preview (web editor): the same engines in WASM as on the host, when it is built
-# (python3 tools/build_preview.py: Emscripten, or clang + wasm-ld)
-if [ -f build/preview/sloop-preview.wasm ]; then
-    run "the editor's audio preview: WASM == host, all 12 engines" sh tests/run_preview_tests.sh
-fi
 [ $fail -eq 0 ] && echo "ALL HOST TESTS PASSED" || { echo "HOST TESTS FAILED"; exit 1; }

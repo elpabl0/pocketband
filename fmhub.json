@@ -1,0 +1,8 @@
+{
+  "what": "A band in your FM-1. Pick a spot on a map of 16 genre towns and it writes a four-piece sketch: drums, bass, keys and lead in one key. Re-roll parts, audition players, jam, morph, play punch-in effects, edit steps, save four slots. With a rhythm game played over your own drum part.",
+  "author": "elpabl0",
+  "kinds": ["groove"],
+  "cheat": "https://github.com/elpabl0/pocketband/blob/main/GUIDE.md",
+  "image": "assets/card/pocket-band.png",
+  "color": "#FF4D6D"
+}

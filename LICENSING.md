@@ -1,12 +1,28 @@
-# Felucca licensing
+# Pocket Band licensing
+
+Pocket Band is free software under the GNU General Public License, version 3 only (`GPL-3.0-only`, full
+text in `LICENSE`). It is derived from [SLOOP](https://github.com/isod89/sloop-fm1) 2.8.5 by isod89, which
+is derived from [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita, Hügelton Instruments;
+both are GPL-3.0-only. Who made what: [CREDITS.md](CREDITS.md).
+
+The rest of this file is Felucca's licensing statement as SLOOP carried it, kept because it still governs
+the code Pocket Band inherits. Changes made for Pocket Band: the rows for material that is no longer in
+this tree (the icon atlas, the panel image, the web editor and its fonts) are removed, and this
+introduction is added. Where it says "Felucca", read the inherited code in this tree.
+
+Pocket Band's own files (`firmware/src/pb_*.c`, `pb_brain.h`, `tests/pb_*.c`, `web/installer.html`'s
+changes, `tools/make_installer.py`, `prototype/`, the guides) are Copyright (C) 2026 the Pocket Band
+authors, GPL-3.0-only.
+
+## Felucca licensing
 
 Felucca is free software. Its **code** is licensed under the GNU General Public License,
 version 3 only (`GPL-3.0-only`, full text in `LICENSE`). Its **assets** are not part of
-that licence: the icon atlas `assets/icons.png`, the panel image `docs/panel.jpg` and the drum sounds made by
-`tools/gen_waves.py` (the Hügelton Sample Pack) are Copyright (C) 2026 Hügelton Instruments,
-all rights reserved. Their licence terms will be published later. SLOOP's firmware does not contain the
-Hügelton Sample Pack: its sampled drum kit is made of CC0 recordings (`assets/samples-cc0/KIT`), and
-`gen_waves.py` only feeds the SLICE engine's demo loop, which SLOOP does not build.
+that licence: the drum sounds made by `tools/gen_waves.py` (the Hügelton Sample Pack) are
+Copyright (C) 2026 Hügelton Instruments, all rights reserved. Their licence terms will be published
+later. The firmware built from this tree does not contain the Hügelton Sample Pack: its sampled drum kit
+is made of CC0 recordings (`assets/samples-cc0/KIT`), and `gen_waves.py` only feeds the SLICE engine's
+demo loop, which is not built.
 
 Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 
@@ -18,7 +34,7 @@ GPL-3.0-only as a whole):
 
 - the firmware: `firmware/` (app, HAL, update loader)
 - the build script and tools: `build.sh`, `tools/`
-- the web pages (installer, editor) and their tests: `web/` (not the Fukiai font, below)
+- the installer page, its libraries and their test: `web/`
 - the host tests: `tests/`
 
 You may use, study, change and share it under the GPL. If you distribute Felucca, or
@@ -45,8 +61,7 @@ assets, is entirely governed by the GPL.
 | What | Licence | Where |
 | --- | --- | --- |
 | Instrument and drum samples (Versilian Studios VSCO-2 CE, VCSL; Sonic Pi: SCRCH) | CC0 1.0 | `assets/samples-cc0/`, provenance in `ATTRIBUTION.txt` there |
-| Terminus font 8x16: the FM-1's screen (Terminus Bold, ter-u16b, SLOOP 2.6), and the web editor's font (the regular ter-u16n; `tools/gen_webfont.py` makes it a TrueType font inlined in `web/editor.html`) | SIL OFL 1.1 | `assets/fonts/ter-u16b.bdf`, `assets/fonts/ter-u16n.bdf`, `assets/fonts/Terminus-LICENSE.txt` |
-| Fukiai icon font (Hügelton Instruments), web editor only | MIT | `web/fukiai.ttf`, `web/FUKIAI-LICENSE.txt` |
+| Terminus font 8x16 (Terminus Bold, ter-u16b): the FM-1's screen | SIL OFL 1.1 | `assets/fonts/ter-u16b.bdf`, `assets/fonts/Terminus-LICENSE.txt` |
 | CrispyZebra by Leo Kuroshita (<https://github.com/hugelton/CrispyZebra>): the PHASE engine's waveforms are a C port of its oscillator | GPL-3.0 | `firmware/src/eng_phase.c` |
 | klattsch by Tony Gies (<https://github.com/tgies/klattsch>): design reference for the VOICE (formant) engine; no code copied. Formant data from Klatt (1980) / Hillenbrand et al. (1995) | MIT (klattsch) | credit only |
 | msfa by Google Inc. and Pascal Gauthier, from Dexed (<https://github.com/asb2m10/dexed>): the FM6 engine's synthesis (SLOOP 2.4), ported to integer C for Felucca 1.0 by Leo Kuroshita (Dexed itself is GPL-3.0; only msfa is used; the FM6 factory patches are Felucca's own) | Apache-2.0 | `firmware/src/fm6_core.c`, `LICENSES/Apache-2.0-msfa.txt` |
