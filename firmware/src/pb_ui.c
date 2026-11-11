@@ -320,19 +320,20 @@ UI_SMALL static void mp_draw(void)
     pb_mix(&a, &b, &bl);
     for (i = 0; i < PB_GENRES; i++) {
         int32_t cx = PB_TOWN[i][1] * 8, cy = 16 + PB_TOWN[i][2] * 8;
-        int hot = i == a || (bl && i == b);
+        int hot = !pb_at_void() && (i == a || (bl && i == b));
         cv_rect(cx, cy + 3, 8, 5, hot && (ui.frame >> 3 & 1u) ? PBC_WHITE : PBC_GOLD);
         cv_rect(cx + 1, cy + 1, 6, 2, PBC_HOT); cv_rect(cx + 3, cy, 2, 1, PBC_HOT); cv_rect(cx + 3, cy + 5, 2, 3, PBC_BG);
     }
-    cv_line(pb.mx, pb.my, PB_TOWN[a][1] * 8 + 4, 16 + PB_TOWN[a][2] * 8 + 4, PBC_WHITE);
-    if (bl)
+    if (!pb_at_void())
+        cv_line(pb.mx, pb.my, PB_TOWN[a][1] * 8 + 4, 16 + PB_TOWN[a][2] * 8 + 4, PBC_WHITE);
+    if (bl && !pb_at_void())
         cv_line(pb.mx, pb.my, PB_TOWN[b][1] * 8 + 4, 16 + PB_TOWN[b][2] * 8 + 4, PBC_HOT);
     pb_sprite(2, pb.mx - 8, pb.my - 10 - (int32_t)(ui.frame >> 3 & 1u), 1, 0);
     for (i = 0; i < 2u; i++) {               /* the two towns in play carry their names */
         uint32_t tw = i ? b : a;
         const char *n = pb_genre_tag(PB_TOWN[tw][0]);
         int32_t w = text_w(&FONT_S, n), lx = clamp(PB_TOWN[tw][1] * 8 + 4 - w / 2, 0, 240 - w), ly = 16 + PB_TOWN[tw][2] * 8 + 9;
-        if (i && !bl)
+        if ((i && !bl) || pb_at_void())
             break;
         cv_rect(lx - 1, ly, w + 2, 14, PBC_BG);
         cv_text(lx, ly - 1, &FONT_S, n, i ? PBC_HOT : PBC_INK);
