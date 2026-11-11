@@ -126,7 +126,10 @@ int main(void)
                 uint32_t a = st_sector(o, c);
                 int data = a >= 0x97000u && a + 4096u <= 0xA0000u, ups = a >= 0xDC000u && a + 4096u <= 0xE0000u;
                 int glob = a >= 0xFC000u && a + 4096u <= 0xFF000u, fm6 = a >= 0xE5000u && a + 4096u <= 0xE7000u;
-                inside &= (data || ups || glob || fm6) && !(a & 0xFFFu);
+                /* Pocket Band: its sketch record (OBJ_POCKET) is the one object inside a sample slot's area, on
+                 * purpose: the last two sectors of USR4, which this firmware never fills (pb_store.c) */
+                int pocket = o == OBJ_POCKET && a >= 0xF9000u && a + 4096u <= 0xFB000u;
+                inside &= (data || ups || glob || fm6 || pocket) && !(a & 0xFFFu);
                 for (o2 = 0; o2 < OBJ_COUNT; o2++)
                     for (c2 = 0; c2 < 2u; c2++)
                         if ((o2 != o || c2 != c) && st_sector(o2, c2) == a)

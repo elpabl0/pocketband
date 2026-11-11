@@ -60,16 +60,7 @@
 #include "audio.c"
 #include "cpu1.c"           /* the second core: boot, self-test, state (ABOUT, console) */
 #include "panel.c"
-#include "ui.c"
-#include "ui_song.c"
-#include "ui_studio.c"
-#include "icons.c"           /* parameter icons (FELUCCA_ICONS), used by ui_draw.c */
-#include "ui_draw.c"
-#include "ui_vis.c"           /* the full-screen visualiser (HOME on HOME, 2.4) */
-#include "ui_layers.c"       /* hold a function button: what the keys and knobs do (TE style) */
-#include "ui_menu.c"
-#include "pocketband.c"      /* Pocket Band: the generator overlay (HOME on TRACKS) */
-#include "ui_input.c"
+#include "pb_ui.c"           /* Pocket Band: the whole interface */
 #ifndef FELUCCA_FLASH
 #define FELUCCA_FLASH 1          /* flash driver + storage.c */
 #endif
@@ -190,14 +181,13 @@ static void ota_commit(const uint8_t *parm)
     fm1_enter_update(parm);                             /* record into RAM, core reset (fm1_sys.h) */
 }
 #endif
-#if FELUCCA_OTA
-#include "editor.c"          /* web editor SysEx (needs the OTA SysEx plumbing) */
-#endif
+static void ed_service(void) {}   /* Pocket Band: SLOOP's web editor protocol is not built (its pages describe SLOOP's screens) */
 #if FELUCCA_CDC
 #include "console.c"
 #endif
 #if FELUCCA_OTA
 #include "recovery.c"        /* early, polled USB updater; no synth or settings */
 #endif
-#include "splash.c"          /* SLOOP boot logo (build/gen/sloop_logo.h) */
+/* (the boot screen: pb_ui.c) */
+#include "pb_store.c"        /* Pocket Band: the sketch kept across power-off */
 #include "main.c"

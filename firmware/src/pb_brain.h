@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define PB_STEPS 64u
-#define PB_GENRES 14u
+#define PB_GENRES 16u
 enum { PB_BASS, PB_CHORD, PB_PAD, PB_LEAD, PB_ARP, PB_ROLES };
 
 typedef struct {            /* one step of a melodic part */
