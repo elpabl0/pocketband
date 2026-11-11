@@ -13,7 +13,10 @@ Pocket Band is its own firmware with its own interface. Underneath, the sound en
 storage, USB and hardware drivers are those of [SLOOP 2.8.5](https://github.com/isod89/sloop-fm1) by
 isod89, which is based on [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton
 Instruments). None of SLOOP's screens remain, and SLOOP's web editor does not talk to this firmware.
-SLOOP's own README is kept as [SLOOP-README.md](SLOOP-README.md) for reference on the engines.
+SLOOP's own README and guide are kept as [SLOOP-README.md](SLOOP-README.md) and
+[SLOOP-GUIDE.md](SLOOP-GUIDE.md) for reference on the engines; they describe SLOOP's screens, not these.
+
+**[How to use it](GUIDE.md)** · **[A demo to run through](DEMO.md)**
 
 ## How it works
 
