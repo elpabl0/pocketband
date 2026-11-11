@@ -4,7 +4,7 @@
  * drawing or knobs. Loading a sound, the factory sound list by kind, undo, a new project, the device's
  * button calibration. Taken from SLOOP 2.8.5's ui.c / ui_input.c / ui_layers.c with the screens removed. */
 #ifndef FELUCCA_VERSION
-#define FELUCCA_VERSION "POCKET BAND 0.3"
+#define FELUCCA_VERSION "POCKET BAND 0.4"
 #endif
 static void project_save(uint32_t slot);
 static void arrangement_save(void);

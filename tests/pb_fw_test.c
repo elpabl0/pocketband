@@ -288,7 +288,30 @@ int main(int argc, char **argv)
         n0 = steps_used(2);
         tap(B_HOME); tap(B_REC); check(song.rec == 1u << 2, "REC while playing: the selected member records");
         for (i = 0; i < 6u; i++) { fm1_in.notes = 1u << (4 + i); frames(9); fm1_in.notes = 0; frames(6); }
-        tap(B_REC); check(!song.rec && steps_used(2) > n0, "the notes played are in its part; REC again stops");
+        check(song.rec && steps_used(2) > n0, "the notes played are in its part");
+        {   uint32_t k, bad = 0;             /* (0.4) the keys really are in the key: every key, a note of the scale */
+            for (k = 0; k < 27u; k++) { uint32_t n = kb_pitch(&trk[2], k, 0); bad += n > 127u || pb_snap(&pb.s, n) != n; }
+            check(!bad && trk[0].p[P_QUANT] == 1, "every key plays a note of the sketch's scale (SNAP)");
+        }
+        /* REC again: TAP. The part is emptied; any key taps a rhythm, the notes are picked from the bar's chord */
+        tap(B_REC);
+        check(pu.t_on && song.rec && !steps_used(2) && layer_now() == LY_MIX, "REC again: TAP mode, the part emptied, the keys play no notes of their own");
+        for (i = 0; i < 8u; i++) { fm1_in.notes = 1u << (3u * i); frames(7); fm1_in.notes = 0; frames(7); }
+        frames(20);
+        check(steps_used(2) >= 4 && on_scale(), "TAP: the taps are in the part, every note in the scale");
+        {   uint32_t st, k, off = 0;
+            for (st = 0; st < NSTEP; st++) for (k = 0; k < trk[2].step[st].n; k++)
+                if (trk[2].step[st].time == ST_NOTE) { int32_t d = pb_note_deg(&pb.s, trk[2].step[st].note[k]) - pb.s.prog[st >> 4]; d = ((d % 7) + 7) % 7; off += !(d == 0 || d == 2 || d == 4); }
+            check(!off, "TAP on the lead: every note a tone of its bar's chord");
+        }
+        for (i = 0; i < 6u; i++) check(!pu.off[i].on || 1, "");
+        frames(12); { uint32_t held = 0; for (i = 0; i < 6u; i++) held += pu.off[i].on; check(!held && !trk[2].nheld, "no tapped note left sounding"); }
+        sel(TRK_DRUM); { uint32_t d0 = steps_used(TRK_DRUM); fm1_in.notes = 1u << 2; frames(5); fm1_in.notes = 0; frames(9); fm1_in.notes = 1u << 12; frames(5); fm1_in.notes = 0; frames(9);
+          check(steps_used(TRK_DRUM) >= d0, "TAP on the drums: low keys the kick, the middle the snare"); }
+        tap(B_REC); check(!pu.t_on && !song.rec && layer_now() == LY_PLAY, "REC a third time: off, the keys play again");
+        tap(B_REC); tap(B_REC); press(B_PLAY); release(B_PLAY); frames(6);
+        check(!pu.t_on && !song.rec && layer_now() == LY_PLAY, "STOP while tapping: tap mode ends with the recording");
+        press(B_PLAY); release(B_PLAY); frames(6); sel(2);
     }
 
     /* CART */
@@ -382,9 +405,36 @@ int main(int argc, char **argv)
         check(pb.have && !memcmp(&pb.s, &s0, sizeof s0) && !memcmp(pb.idea, idea0, 4) && pb.energy == e0 && pb.skin == 0 && pb.fit[0] >= 40, "power on: the sketch, the ideas, the energy and the skin are back");
         { step_t keep[NSTEP]; memcpy(keep, trk[0].step, sizeof keep); turn(EN_K1, 1); turn(EN_K1, -1);
           check(!memcmp(keep, trk[0].step, sizeof keep), "and the IDEA knob goes on from where it was"); }
+        pu.j_tour = 16; pb_void(); frames(4); press(B_PLAY); release(B_PLAY); frames(700);
+        { uint8_t src0[4]; memcpy(src0, pb.s.src, 4); memset(&pb.s, 0, sizeof pb.s); pb.have = 0; pu.j_tour = 0;
+          pb_store_boot(); check(pb.have == 2 && !memcmp(src0, pb.s.src, 4) && !memcmp(pb.entry, "??????", 6) && pu.j_tour == 16, "the void and the tour are remembered too"); pu.j_tour = 0; }
         nor[0xF9000 + 300] ^= 0x55; nor[0xFA000 + 300] ^= 0x55; pb.have = 0;
         pb_store_boot(); check(!pb.have, "a damaged record is not taken");
         pb_travel(0, 0, 0, 5u); frames(4);
+    }
+
+    {   /* 0.4: the tour, the void, the words */
+        pb_song_t s0; uint8_t scr0; uint32_t moved = 0;
+        if (!song.playing) { press(B_PLAY); release(B_PLAY); frames(6); }
+        tap(B_LFO); turn(EN_K4, 1); turn(EN_K4, 1);
+        check(pu.j_tour == 16, "JAM: KNOB 4 TOUR, every 16 bars");
+        s0 = pb.s; scr0 = pb.scr;
+        for (i = 0; i < 3000u && !moved; i++) { frame(); moved = pb.s.seed != s0.seed; }
+        check(moved && pb.scr == scr0 && song.playing && on_scale() && pb.have == 1, "on tour: the band moves on to a new sketch by itself, the screen stays");
+        turn(EN_K4, -1); turn(EN_K4, -1); check(!pu.j_tour, "TOUR off");
+        tap(B_GLO); pb.mx = 232; pb.my = 168; frames(12); ppm("pb-map-void");
+        tap(B_GLO); frames(4);
+        check(pb.have == 2 && !memcmp(pb.entry, "??????", 6) && on_scale() && steps_used(0) && steps_used(TRK_DRUM), "off the map's corner: the void, a sketch with no code");
+        check(!trk[0].p[P_MUTE] && !trk[1].p[P_MUTE] && !trk[2].p[P_MUTE] && !TDRUM->p[P_MUTE], "in the void everyone is awake");
+        tap(B_SAVE); while (pu.c_page != 0u) turn(EN_K1, 1); frames(2); ppm("pb-cart-void");
+        { int16_t b0 = song.g[G_BPM]; memcpy(pb.entry, "FASTER", 7); tap(B_SAVE); check(song.g[G_BPM] > b0 && pb.have == 2, "the word FASTER: faster, the sketch stays");
+          memcpy(pb.entry, "SLEEPY", 7); tap(B_SAVE); check(song.g[G_BPM] < b0 * 5 / 4 && pb.energy == 4, "SLEEPY: slower and quieter"); }
+        { uint8_t sk = pb.skin; memcpy(pb.entry, "PARTY2", 7); tap(B_SAVE); frames(500);
+          check(pu.party && pb.energy == 20 && pb.skin != sk, "PARTY2: full energy, the colours change with the bars");
+          tap(B_SAVE); frames(2); check(!pu.party, "PARTY2 again: over"); pb.skin = 0; pb_skin_apply(); }
+        pb_travel(1, 1, 0, 9u); frames(2); tap(B_SAVE);
+        memcpy(pb.entry, "SECRET", 7); tap(B_SAVE); check(pb.have == 2, "the word SECRET: the void");
+        tap(B_HOME);
     }
 
     /* every town, pure and blended: in scale, audible, not clipping */

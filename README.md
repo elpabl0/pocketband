@@ -5,7 +5,7 @@ writes a four-piece sketch (drums, bass, keys, lead) in one key and tempo, with 
 re-roll any member, audition replacements, change the key, let the band jam, play punch-in effects on
 the keys, edit any part step by step, and keep what you like in four save slots.
 
-**Status: 0.3, experimental.** 0.2 has been installed and run on an FM-1. What 0.3 adds (below) is tested
+**Status: 0.4, experimental.** 0.2 has been installed and run on an FM-1. What 0.3 and 0.4 add is tested
 on a computer against the real sound engines and sequencer (see Tests), not yet on the device. Install at
 your own risk.
 
@@ -26,7 +26,7 @@ One rule: **a button opens its screen; pressed again, it does that screen's main
 | EDIT | **Audition**: three other players, ranked by fit | pick, more | hire the one you picked |
 | SEQ | **Grid**: the member's part, step by step | step, note, length, bar | put / remove a note |
 | ENV | **Sound**: three pages of four knobs | (the page's four) | next page |
-| LFO | **Jam**: the band changes its own parts | how often, energy, morph | change a part now |
+| LFO | **Jam**: the band changes its own parts | how often, energy, morph, tour | change a part now |
 | FX | **Perform**: the 27 keys are effects | filter, dust, duck, fade | build, then drop |
 | SEL | **Key**: key, scale, swing, chords | root, scale, swing, chords | next chord set |
 | ARP | **Visuals**: scope, meters, stars, and the run | mode | next mode (the run: start) |
@@ -38,7 +38,10 @@ On every screen:
 - The **keys** play the selected member, in the sketch's key. On Perform they are the effects.
 - **OCT− / OCT+** move the keys an octave. On Jam they kill / keep the last change; on Perform they
   are the reverb and echo throws; on the drums, held, they play a ghost or a hard hit.
-- **PLAY** starts and stops. **REC** records what you play into the member's part.
+- **PLAY** starts and stops. **REC** records what you play into the member's part. **REC again** is TAP:
+  the part is emptied and any key taps its rhythm in, with the notes picked for you from each bar's
+  chord (bass: root, fifth, octave by how high the key; keys: the whole chord; lead: a tone that rises
+  with the key; drums: kick, snare, hat by thirds of the keyboard). REC a third time ends it.
 
 Notes on a few screens:
 
@@ -47,7 +50,10 @@ Notes on a few screens:
 - **Stage.** IDEA and ENERGY write a part again from its seed, so hand edits to that part are replaced.
   Shape the sketch first, edit afterwards.
 - **Jam.** MORPH leans every part towards its next idea, step by step: 0 is the part as it is, 100 the
-  next idea. The same morph always gives the same notes.
+  next idea. The same morph always gives the same notes. TOUR sends the band on along the map by
+  itself every 16 or 32 bars: a few steps from where it stands, then a new sketch there.
+- **Map.** There is something off the south-east corner.
+- **Codes.** Four six-letter words are not places: FASTER, SLEEPY, PARTY2 and SECRET.
 - **Perform.** FX again: from the next bar, two bars of a snare roll with the bass out and the filter
   rising, then the drop: the drums back, the filter open, everyone awake.
 - **The run.** The fourth of the Visuals is a game. The selected member runs along the drum part that

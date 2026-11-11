@@ -47,6 +47,9 @@ static struct {
     uint8_t r_on, r_lives, r_flash, r_jv, r_dv;
     uint16_t r_score, r_best, r_combo;
     uint32_t r_jump, r_duck, r_last, r_off;
+    /* TAP: REC's second mode; the tour; the party */
+    uint8_t t_on, j_tour, party;
+    struct { uint8_t on, trk, note; uint32_t t0; } off[6];
     /* CART */
     uint8_t c_page, c_slot, c_act, c_item;
     /* frame */
@@ -139,7 +142,7 @@ UI_SMALL static void pb_head(const char *title)
     x = 236 - text_w(&FONT_S, b) - 22;
     cv_text(x, 0, &FONT_S, b, PBC_BG);
     if (song.rec || rec_wait)
-        cv_rect(218, 4, 8, 8, (rec_wait && (ui.frame >> 3 & 1u)) ? PBC_INK : PBC_HOT);
+        cv_rect(218, 4, 8, 8, (rec_wait && (ui.frame >> 3 & 1u)) ? PBC_INK : pu.t_on ? PBC_GOLD : PBC_HOT);
     if (song.playing)
         for (i = 0; i < 5; i++)
             cv_rect(229 + i, 3 + i, 1, 10 - 2 * i, clk_pos < BEAT_U / 4u ? PBC_HOT : PBC_BG);
@@ -334,9 +337,13 @@ UI_SMALL static void mp_draw(void)
         cv_rect(lx - 1, ly, w + 2, 14, PBC_BG);
         cv_text(lx, ly - 1, &FONT_S, n, i ? PBC_HOT : PBC_INK);
     }
+    if (pb.mx > 176 && pb.my > 120 && (ui.frame >> 3 & 1u))
+        pb_txt(228, 160, "?", pb_at_void() ? PBC_WHITE : PBC_MID);   /* something off the corner */
     cv_rect(0, 176, 240, 30, PBC_BG);
     cv_rect(0, 176, 240, 1, PBC_INK);
-    pb_cpy(line, pb_genre_name(PB_TOWN[a][0]), 20);
+    pb_cpy(line, pb_at_void() ? "??? THE VOID" : pb_genre_name(PB_TOWN[a][0]), 20);
+    if (pb_at_void())
+        bl = 0;
     if (bl) {
         pb_cat(line, " + ", sizeof line);
         pb_cat(line, pb_genre_name(PB_TOWN[b][0]), sizeof line);
@@ -347,7 +354,7 @@ UI_SMALL static void mp_draw(void)
         cv_rect(3, 196, (int32_t)(100u - bl * 100u / 14u), 5, PBC_INK);
         cv_rect(3 + (int32_t)(100u - bl * 100u / 14u), 196, (int32_t)(bl * 100u / 14u), 5, PBC_HOT);
     } else
-        pb_txt(3, 190, "PURE", PBC_MID);
+        pb_txt(3, 190, pb_at_void() ? "NO MAP HERE" : "PURE", PBC_MID);
     pb_txt(124, 190, "GLO: TRAVEL", (ui.frame >> 4 & 1u) ? PBC_WHITE : PBC_GOLD);
     fmt_int(v[0], pb.mx);
     fmt_int(v[1], pb.my);
@@ -714,6 +721,20 @@ UI_SMALL static void jm_tick(void)           /* every frame, on every screen: th
     if (!song.playing || bar == pu.j_bar)
         return;
     pu.j_bar = bar;
+    if (pu.party) {                          /* (the code PARTY2: a new skin every bar) */
+        pb.skin = (uint8_t)((pb.skin + 1u) % PB_SKINS);
+        pb_skin_apply();
+    }
+    if (pu.j_tour && bar && bar % pu.j_tour == 0u && !pu.b_on && pu.r_on != 1u) {
+        uint32_t h = pb_hash(fm1_ms, bar);   /* a walk of a few steps from where the band stands, then a new sketch there */
+        pb.mx = (int16_t)clamp(pb.mx + (int32_t)(h % 97u) - 48, 4, 220);
+        pb.my = (int16_t)clamp(pb.my + (int32_t)((h >> 8) % 73u) - 36, 20, 156);
+        pb_stay = 1;
+        pb_go();
+        pb_stay = 0;
+        pu.j_wait = 0;
+        return;
+    }
     if (pu.j_rate && bar && bar % pu.j_rate == 0u)
         jm_change();
 }
@@ -733,7 +754,7 @@ UI_SMALL static void jm_judge(int keep)
 }
 UI_SMALL static void jm_draw(void)
 {
-    static const char *const L[4] = {"EVERY", "ENERGY", "MORPH", 0};
+    static const char *const L[4] = {"EVERY", "ENERGY", "MORPH", "TOUR"};
     char v[4][8], line[32];
     uint32_t t;
     pb_head("JAM");
@@ -758,10 +779,16 @@ UI_SMALL static void jm_draw(void)
         pb_txtc(120, 130, "NO CHANGE WAITING", PBC_MID);
     for (t = 0; t < 20u; t++)
         cv_rect(3 + (int32_t)t * 12, 166, 10, 8, t < pb.energy ? PBC_HOT : PBC_DIM);
-    pb_txt(3, 184, "LFO: CHANGE A PART NOW", PBC_MID);
+    if (pu.j_tour) {
+        pb_cpy(line, "ON TOUR: A NEW PLACE IN ", sizeof line);
+        pb_catn(line, (int32_t)(pu.j_tour - (clk_beat / 4u) % pu.j_tour), sizeof line);
+        pb_txt(3, 184, line, PBC_GOLD);
+    } else
+        pb_txt(3, 184, "LFO: CHANGE A PART NOW", PBC_MID);
     if (pu.j_rate) fmt_int(v[0], pu.j_rate); else pb_cpy(v[0], "OFF", 8);
     fmt_int(v[1], pb.energy * 5);
     fmt_int(v[2], pb.morph * 10);
+    if (pu.j_tour) fmt_int(v[3], pu.j_tour); else pb_cpy(v[3], "OFF", 8);
     pb_foot(L, v);
 }
 UI_SMALL static void jm_knob(uint32_t k, int32_t s)
@@ -778,6 +805,10 @@ UI_SMALL static void jm_knob(uint32_t k, int32_t s)
             pb.morph = (uint8_t)m;
             pb_rewrite_all();
         }
+    } else {                                 /* the tour: every so many bars the band moves on along the map */
+        static const uint8_t TR[3] = {0, 32, 16};
+        uint32_t at = pu.j_tour == 32u ? 1u : pu.j_tour == 16u ? 2u : 0u;
+        pu.j_tour = TR[clamp((int32_t)at + (s > 0 ? 1 : -1), 0, 2)];
     }
 }
 
@@ -1215,7 +1246,9 @@ UI_SMALL static void ct_draw(void)
     v[3][0] = 0;
     if (pu.c_page == 0u) {
         pb_txt(8, 38, "THIS SKETCH", PBC_MID);
-        if (pb.have) {
+        if (pb.have == 2u)
+            pb_txt(8, 58, "THE VOID HAS NO CODE", PBC_INK);
+        else if (pb.have) {
             pb_encode(&pb.s, pw);
             for (i = 0; i < 6u; i++) {
                 one[0] = pw[i];
@@ -1310,7 +1343,26 @@ UI_SMALL static void ct_action(void)
 {
     uint32_t ga, gb, bl, seed, s = pu.c_slot;
     if (pu.c_page == 0u) {
-        if (pb_decode(pb.entry, &ga, &gb, &bl, &seed))
+        /* four words that are not places */
+        if (!memcmp(pb.entry, "FASTER", 6)) {
+            song.g[G_BPM] = (int16_t)clamp(song.g[G_BPM] * 5 / 4, GP[G_BPM].min, GP[G_BPM].max);
+            ui_message("FASTER!");
+        } else if (!memcmp(pb.entry, "SLEEPY", 6)) {
+            song.g[G_BPM] = (int16_t)clamp(song.g[G_BPM] * 3 / 4, GP[G_BPM].min, GP[G_BPM].max);
+            if (pb.have) { pb.energy = 4; pb_rewrite_all(); }
+            ui_message("SHHH...");
+        } else if (!memcmp(pb.entry, "PARTY2", 6)) {
+            uint32_t t;
+            pu.party = (uint8_t)!pu.party;
+            if (pu.party) {
+                for (t = 0; t < NTRK; t++)
+                    trk[t].p[P_MUTE] = 0;
+                if (pb.have) { pb.energy = 20; pb_rewrite_all(); }
+            }
+            ui_message(pu.party ? "PARTY!" : "THE PARTY IS OVER");
+        } else if (!memcmp(pb.entry, "SECRET", 6))
+            pb_void();
+        else if (pb_decode(pb.entry, &ga, &gb, &bl, &seed))
             pb_travel(ga, gb, bl, seed);
         else
             ui_message("NO SUCH PLACE");
@@ -1414,11 +1466,72 @@ UI_SMALL static void pb_action(void)         /* the screen's own button again */
     default: ct_action(); break;
     }
 }
+/* TAP: a key's tap is played and recorded as a note the brain picks: the bass its chord's root (higher keys the
+ * fifth, the octave), the keys the whole chord, the lead a chord or scale tone that rises with the key; the drums
+ * kick, snare, hat by thirds of the keyboard. The sequencer's own recording puts it on its step. */
+UI_SMALL static void tp_off(uint32_t i)
+{
+    fm1_irq_off();
+    input_off(&trk[pu.off[i].trk % NPART], pu.off[i].note);
+    fm1_irq_on();
+    pu.off[i].on = 0;
+}
+UI_SMALL static void tp_tick(void)
+{
+    uint32_t i;
+    for (i = 0; i < 6u; i++)
+        if (pu.off[i].on && fm1_ms - pu.off[i].t0 >= 110u)
+            tp_off(i);
+}
+UI_SMALL static void tp_key(uint32_t k)
+{
+    static const int8_t ST[6] = {0, 2, 4, 7, 9, 11};
+    track_t *T = TSEL;
+    uint32_t sel = song.sel % NTRK, n = 0, i, j, role;
+    int32_t c = pb.s.prog[(T->seq_idx >> 4) & 3u];
+    uint8_t nt[4];
+    if (sel == TRK_DRUM) {
+        fm1_irq_off();
+        drum_input(k < 9u ? 0u : k < 18u ? 2u : 4u, LV_NORM, 0, 1);
+        fm1_irq_on();
+        return;
+    }
+    role = pb.s.role[sel];
+    if (role == PB_BASS) {
+        uint32_t base = pb_fold(pb_note(&pb.s, 21 + c), 28u, 40u);
+        nt[n++] = (uint8_t)(base + (k < 9u ? 0u : k < 18u ? pb_note(&pb.s, 21 + c + 4) - pb_note(&pb.s, 21 + c) : 12u));
+    } else if (role == PB_CHORD || role == PB_PAD)
+        n = pb_tones(&pb.s, c, 53u, 65u, nt);
+    else
+        nt[n++] = (uint8_t)pb_fold(pb_note(&pb.s, 35 + c + ST[k * 6u / 27u]), 60u, 87u);
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < 6u && pu.off[j].on; j++) {}
+        if (j == 6u) { j = 0; tp_off(0); }   /* (more than six sounding: the first ends early) */
+        fm1_irq_off();
+        input_on(T, nt[i], 100);
+        fm1_irq_on();
+        pu.off[j].on = 1; pu.off[j].trk = (uint8_t)sel; pu.off[j].note = nt[i]; pu.off[j].t0 = fm1_ms;
+    }
+}
 UI_SMALL static void pb_rec(void)
 {
-    if (song.rec || rec_wait) {
-        song.rec = 0; rec_wait = 0;
+    track_t *T = TSEL;
+    if (pu.t_on) {
+        song.rec = 0; rec_wait = 0; pu.t_on = 0;
         ui_message("REC OFF");
+        return;
+    }
+    if (song.rec || rec_wait) {              /* REC again: TAP. The part is emptied; any key taps its rhythm in, and the
+                                              * notes are picked for you from the chord of the bar (tp_key) */
+        undo_mark(T, (undo_sess += 4u) | 3u);
+        fm1_irq_off();
+        steps_clear(T);
+        T->seq_active = 1;
+        panic_req |= (uint8_t)(1u << (song.sel % NTRK));
+        fm1_irq_on();
+        T->p[P_MUTE] = 0;
+        pu.t_on = 1;
+        ui_message("TAP: ANY KEY, PART EMPTIED");
         return;
     }
     arrangement_enabled = 0;
@@ -1444,6 +1557,9 @@ UI_SMALL static void ui_input(void)
     rec_go = 0; ft_bars = 0; mono_hint = 0; er_flash = 0;
     jm_tick();
     bd_tick();
+    tp_tick();
+    if (pu.t_on && !song.rec && !rec_wait)
+        pu.t_on = 0;                         /* (STOP ended the recording: the tap mode with it) */
     for (id = 0; id < 14u; id++) {
         uint32_t b;
         if (!((pressed >> id) & 1u))
@@ -1470,7 +1586,11 @@ UI_SMALL static void ui_input(void)
         pu.thr = (uint8_t)(((fm1_in.buttons >> panel.btn[B_OCTDN]) & 1u) | (((fm1_in.buttons >> panel.btn[B_OCTUP]) & 1u) << 1));
         thr_req = pu.thr;
     }
-    if (pb.scr == PS_VIS && pu.v_mode == 3u && notes)
+    if (pu.t_on && notes) {
+        for (k = 0; k < 27u; k++)
+            if ((notes >> k) & 1u)
+                tp_key(k);
+    } else if (pb.scr == PS_VIS && pu.v_mode == 3u && notes)
         rn_press((notes >> 13) != 0u);         /* F3..F#4 duck, G4..G5 jump */
     if (pb.scr == PS_GRID && notes && !song.playing && !gr_drum()) {   /* stopped: a key writes its note, the cursor moves on */
         for (k = 0; k < 27u; k++)
@@ -1509,6 +1629,8 @@ UI_SMALL static void ui_input(void)
         default: ct_knob(k, s); break;
         }
     }
+    /* what the keys are: taps (no notes of their own), PERFORM's effects, the run's jump and duck, or notes */
+    ly_lock = (uint8_t)(pu.t_on ? LY_MIX : pb.scr == PS_PERFORM ? LY_FX : pb.scr == PS_VIS && pu.v_mode == 3u ? LY_MIX : LY_PLAY);
 }
 UI_SMALL static void ui_draw(void)
 {

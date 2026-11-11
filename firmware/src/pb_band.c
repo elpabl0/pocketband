@@ -267,8 +267,10 @@ UI_SMALL static void pb_key(void)
     for (t = 0; t < NPART; t++) {
         trk[t].p[P_ROOT] = pb.s.root;
         trk[t].p[P_SCALE] = PB_SCALE_OF[pb.s.scale % PB_SCALES];
+        trk[t].p[P_QUANT] = 1;               /* SNAP: every key plays a note of the scale */
     }
 }
+static uint8_t pb_stay;                       /* a journey that leaves the screen where it is (the tour) */
 UI_SMALL static void pb_travel(uint32_t ga, uint32_t gb, uint32_t blend, uint32_t seed)
 {
     uint32_t t;
@@ -287,14 +289,42 @@ UI_SMALL static void pb_travel(uint32_t ga, uint32_t gb, uint32_t blend, uint32_
     pb_fits();
     pb_encode(&pb.s, pb.entry);
     pb.have = 1;
-    pb.scr = PS_STAGE;
+    if (!pb_stay)
+        pb.scr = PS_STAGE;
     if (!song.playing)
         transport_req = 1;
     ui_say(pb_genre_name(ga), blend ? " MIX" : "");
 }
+UI_SMALL static void pb_rewrite_all(void);
+/* the void: a place off the map's south-east corner (and the code SECRET). Each member comes from a town of its
+ * own, whatever the sketch's two towns are, so no code describes it: pb.have is 2, the code reads ?????? */
+#define PB_VOID_X 224
+#define PB_VOID_Y 160
+UI_SMALL static int pb_at_void(void) { return pb.mx >= PB_VOID_X && pb.my >= PB_VOID_Y; }
+UI_SMALL static void pb_void(void)
+{
+    uint32_t t, seed = (fm1_ticks() * 2654435761u) >> 13, g0 = pb_hash(seed, 1) % PB_GENRES;
+    pb_travel(g0, (g0 + 7u) % PB_GENRES, 7, seed);
+    for (t = 0; t < NTRK; t++)
+        pb.s.src[t] = (uint8_t)((g0 + 3u + t * 5u + pb_hash(seed, t + 2u) % 3u) % PB_GENRES);
+    pb.s.role[1] = PB_G[pb.s.src[1]].keys;
+    pb.s.role[2] = PB_G[pb.s.src[2]].lead;
+    for (t = 0; t < NTRK; t++) {
+        pb_sound(t);
+        trk[t].p[P_MUTE] = 0;
+    }
+    pb_rewrite_all();
+    pb.have = 2;
+    memcpy(pb.entry, "??????", 7);
+    ui_message("WELCOME TO THE VOID");
+}
 UI_SMALL static void pb_go(void)
 {
     uint32_t a, b, bl;
+    if (pb_at_void()) {
+        pb_void();
+        return;
+    }
     pb_mix(&a, &b, &bl);
     pb_travel(PB_TOWN[a][0], bl ? PB_TOWN[b][0] : PB_TOWN[a][0], bl, (fm1_ticks() * 2654435761u) >> 13);
 }
