@@ -144,3 +144,5 @@ a page that installs it).
 GPL-3.0-only, as SLOOP and Felucca; see [LICENSE](LICENSE), [LICENSING.md](LICENSING.md),
 [CREDITS.md](CREDITS.md) and `LICENSES/`. "M-VAVE" and "FM-1" are trademarks of their owners; this is independent firmware, not
 affiliated with or supported by them, nor by the SLOOP or Felucca authors.
+
+You can also try Pocket Band in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
